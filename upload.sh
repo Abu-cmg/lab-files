@@ -3,6 +3,33 @@
 echo "[+] Starting vulnerable upload lab setup..."
 
 # -----------------------------
+# Stop ALL other web servers
+# -----------------------------
+echo "[+] Stopping any running web servers..."
+
+SERVICES=(
+    apache2
+    httpd
+    nginx
+    lighttpd
+    lsws
+    mysql
+)
+
+for svc in "${SERVICES[@]}"; do
+    if systemctl list-units --type=service | grep -q "$svc"; then
+        sudo systemctl stop "$svc" 2>/dev/null
+        sudo systemctl disable "$svc" 2>/dev/null
+        echo "    [-] Stopped $svc"
+    fi
+done
+
+# Kill anything using port 80 or 443
+echo "[+] Killing processes on ports 80 and 443..."
+sudo fuser -k 80/tcp 2>/dev/null
+sudo fuser -k 443/tcp 2>/dev/null
+
+# -----------------------------
 # Detect package manager
 # -----------------------------
 if command -v apt >/dev/null 2>&1; then
@@ -24,20 +51,22 @@ if [ "$PKG" = "apt" ]; then
     sudo apt install -y apache2 php libapache2-mod-php
     WEB_ROOT="/var/www/html"
     SERVICE="apache2"
+    USER="www-data"
 else
     sudo yum install -y httpd php
     WEB_ROOT="/var/www/html"
     SERVICE="httpd"
+    USER="apache"
 fi
 
 # -----------------------------
-# Start & enable server
+# Start ONLY Apache
 # -----------------------------
 sudo systemctl start $SERVICE
 sudo systemctl enable $SERVICE
 
 # -----------------------------
-# Create lab directory
+# Create lab directories
 # -----------------------------
 LAB_DIR="$WEB_ROOT/upload_lab"
 UPLOAD_DIR="$LAB_DIR/uploads"
@@ -53,6 +82,7 @@ echo "[+] Creating vulnerable upload script..."
 sudo tee $LAB_DIR/index.php > /dev/null << 'EOF'
 <?php
 $upload_dir = "uploads/";
+
 if (!file_exists($upload_dir)) {
     mkdir($upload_dir, 0777, true);
 }
@@ -71,10 +101,10 @@ if (isset($_FILES['file'])) {
 <!DOCTYPE html>
 <html>
 <head>
-    <title>File Upload Vulnerability Lab</title>
+    <title>Vulnerable File Upload Lab</title>
 </head>
 <body>
-<h2>🔥 Vulnerable File Upload Lab</h2>
+<h2>🔥 File Upload Vulnerability Lab</h2>
 
 <form method="POST" enctype="multipart/form-data">
     <input type="file" name="file">
@@ -82,17 +112,17 @@ if (isset($_FILES['file'])) {
     <input type="submit" value="Upload">
 </form>
 
-<p><b>Warning:</b> This lab is intentionally insecure.</p>
+<p><b>WARNING:</b> This lab is intentionally insecure.</p>
 </body>
 </html>
 EOF
 
 # -----------------------------
-# Set permissions (INSECURE)
+# Insecure permissions
 # -----------------------------
-echo "[+] Setting insecure permissions..."
+echo "[+] Setting INSECURE permissions..."
 sudo chmod -R 777 $LAB_DIR
-sudo chown -R www-data:www-data $LAB_DIR 2>/dev/null || sudo chown -R apache:apache $LAB_DIR
+sudo chown -R $USER:$USER $LAB_DIR
 
 # -----------------------------
 # Restart server
@@ -105,8 +135,9 @@ sudo systemctl restart $SERVICE
 IP=$(hostname -I | awk '{print $1}')
 
 echo ""
-echo "[✓] VULNERABLE LAB INSTALLED SUCCESSFULLY"
-echo "[✓] Open in browser:"
+echo "[✓] VULNERABLE WEB LAB READY"
+echo "[✓] Other web servers STOPPED"
+echo "[✓] Access here:"
 echo "    http://$IP/upload_lab/"
 echo ""
-echo "[!] DO NOT expose this server to the internet"
+echo "[!] DO NOT expose this machine to the internet"
