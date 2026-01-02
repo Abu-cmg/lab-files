@@ -1,4 +1,5 @@
 #!/bin/bash
+sudo systemctl unmask nginx 2>/dev/null || true
 
 set -e
 
@@ -136,3 +137,4 @@ echo "=============================="
 echo "[✓] NGINX LAB READY"
 echo "[✓] Open: http://$IP/"
 echo "=============================="
+
