@@ -3,9 +3,32 @@
 # -----------------------------
 # Simple Website Hosting Script
 # Ubuntu | Port 80 | Nginx
+# With Web Server Conflict Cleanup
 # -----------------------------
 
 set -e
+
+echo "[+] Stopping other web servers (if any)..."
+
+SERVICES=(
+    apache2
+    httpd
+    nginx
+    lighttpd
+    lsws
+)
+
+for svc in "${SERVICES[@]}"; do
+    if systemctl list-units --type=service | grep -q "$svc"; then
+        sudo systemctl stop "$svc" 2>/dev/null
+        sudo systemctl disable "$svc" 2>/dev/null
+        echo "    [-] Stopped $svc"
+    fi
+done
+
+echo "[+] Killing processes on ports 80 and 443..."
+sudo fuser -k 80/tcp 2>/dev/null || true
+sudo fuser -k 443/tcp 2>/dev/null || true
 
 echo "[+] Updating system..."
 sudo apt update -y
@@ -88,5 +111,7 @@ sudo nginx -t
 echo "[+] Reloading Nginx..."
 sudo systemctl reload nginx
 
-echo "[✔] Website hosted successfully on port 80"
-echo "[✔] Open: http://YOUR_SERVER_IP/"
+IP=$(hostname -I | awk '{print $1}')
+
+echo "[✔] Website hosted successfully"
+echo "[✔] Open: http://$IP/"
