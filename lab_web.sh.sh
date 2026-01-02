@@ -7,14 +7,14 @@ echo " ALL-IN-ONE NGINX LAB SCRIPT"
 echo "=============================="
 
 # -----------------------------
-# 1️⃣ Stop conflicting services
+# 1️⃣ Stop & mask OTHER servers
 # -----------------------------
 echo "[+] Stopping conflicting web servers..."
 
 SERVICES=(apache2 httpd lighttpd lsws)
 
 for svc in "${SERVICES[@]}"; do
-    if systemctl list-unit-files | grep -q "$svc"; then
+    if systemctl list-unit-files | grep -q "^$svc"; then
         sudo systemctl stop "$svc" 2>/dev/null || true
         sudo systemctl disable "$svc" 2>/dev/null || true
         sudo systemctl mask "$svc" 2>/dev/null || true
@@ -23,16 +23,21 @@ for svc in "${SERVICES[@]}"; do
 done
 
 # -----------------------------
-# 2️⃣ Kill ports 80 / 443
+# 2️⃣ Ensure nginx is UNMASKED
+# -----------------------------
+echo "[+] Ensuring nginx is unmasked..."
+sudo systemctl unmask nginx 2>/dev/null || true
+
+# -----------------------------
+# 3️⃣ Kill ports 80 / 443
 # -----------------------------
 echo "[+] Clearing ports 80 and 443..."
 sudo fuser -k 80/tcp 2>/dev/null || true
 sudo fuser -k 443/tcp 2>/dev/null || true
-
 sleep 2
 
 # -----------------------------
-# 3️⃣ Check ports are free
+# 4️⃣ Verify ports are free
 # -----------------------------
 echo "[+] Verifying ports..."
 if sudo ss -tulpn | grep -E ':80|:443'; then
@@ -43,18 +48,18 @@ else
 fi
 
 # -----------------------------
-# 4️⃣ Install Nginx if missing
+# 5️⃣ Install nginx
 # -----------------------------
 if ! command -v nginx >/dev/null 2>&1; then
     echo "[+] Installing Nginx..."
     sudo apt update -y
-    sudo apt install nginx -y
+    sudo apt install -y nginx
 else
     echo "[✓] Nginx already installed"
 fi
 
 # -----------------------------
-# 5️⃣ Create website files
+# 6️⃣ Create site files
 # -----------------------------
 echo "[+] Creating website directory..."
 sudo mkdir -p /var/www/cyberlab
@@ -63,22 +68,22 @@ sudo tee /var/www/cyberlab/index.html > /dev/null << 'EOF'
 <!DOCTYPE html>
 <html>
 <head>
-    <title>CyberLab</title>
-    <style>
-        body {
-            background:#0d1117;
-            color:#00ff9c;
-            font-family: monospace;
-            text-align:center;
-            padding-top:10%;
-        }
-        .box {
-            border:2px solid #00ff9c;
-            display:inline-block;
-            padding:30px;
-            border-radius:10px;
-        }
-    </style>
+<title>CyberLab</title>
+<style>
+body {
+    background:#0d1117;
+    color:#00ff9c;
+    font-family: monospace;
+    text-align:center;
+    padding-top:10%;
+}
+.box {
+    border:2px solid #00ff9c;
+    display:inline-block;
+    padding:30px;
+    border-radius:10px;
+}
+</style>
 </head>
 <body>
 <div class="box">
@@ -91,15 +96,14 @@ sudo tee /var/www/cyberlab/index.html > /dev/null << 'EOF'
 EOF
 
 # -----------------------------
-# 6️⃣ Configure Nginx site
+# 7️⃣ Configure nginx site
 # -----------------------------
-echo "[+] Configuring Nginx site..."
+echo "[+] Configuring nginx site..."
 
 sudo tee /etc/nginx/sites-available/cyberlab > /dev/null << 'EOF'
 server {
     listen 80 default_server;
     server_name _;
-
     root /var/www/cyberlab;
     index index.html;
 
@@ -113,21 +117,18 @@ sudo ln -sf /etc/nginx/sites-available/cyberlab /etc/nginx/sites-enabled/
 sudo rm -f /etc/nginx/sites-enabled/default
 
 # -----------------------------
-# 7️⃣ Test Nginx config
+# 8️⃣ Test & start nginx
 # -----------------------------
-echo "[+] Testing Nginx configuration..."
+echo "[+] Testing nginx config..."
 sudo nginx -t
 
-# -----------------------------
-# 8️⃣ Start Nginx safely
-# -----------------------------
-echo "[+] Starting Nginx..."
+echo "[+] Starting nginx..."
 sudo systemctl daemon-reload
-sudo systemctl restart nginx
 sudo systemctl enable nginx
+sudo systemctl restart nginx
 
 # -----------------------------
-# 9️⃣ Final status
+# 9️⃣ Done
 # -----------------------------
 IP=$(hostname -I | awk '{print $1}')
 
