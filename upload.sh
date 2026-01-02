@@ -1,4 +1,5 @@
 #!/bin/bash
+sudo systemctl unmask apache2 2>/dev/null || true
 
 set -e
 
@@ -114,3 +115,4 @@ echo "[✓] VULNERABLE UPLOAD LAB READY"
 echo "[✓] Access: http://$IP/upload_lab/"
 echo "[!] DO NOT expose this machine to the internet"
 echo "======================================="
+
