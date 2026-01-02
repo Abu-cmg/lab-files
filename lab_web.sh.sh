@@ -1,93 +1,103 @@
 #!/bin/bash
 
-# -----------------------------
-# Simple Website Hosting Script
-# Ubuntu | Port 80 | Nginx
-# With Web Server Conflict Cleanup
-# -----------------------------
-
 set -e
 
-echo "[+] Stopping other web servers (if any)..."
+echo "=============================="
+echo " ALL-IN-ONE NGINX LAB SCRIPT"
+echo "=============================="
 
-SERVICES=(
-    apache2
-    httpd
-    nginx
-    lighttpd
-    lsws
-)
+# -----------------------------
+# 1️⃣ Stop conflicting services
+# -----------------------------
+echo "[+] Stopping conflicting web servers..."
+
+SERVICES=(apache2 httpd lighttpd lsws)
 
 for svc in "${SERVICES[@]}"; do
-    if systemctl list-units --type=service | grep -q "$svc"; then
-        sudo systemctl stop "$svc" 2>/dev/null
-        sudo systemctl disable "$svc" 2>/dev/null
-        echo "    [-] Stopped $svc"
+    if systemctl list-unit-files | grep -q "$svc"; then
+        sudo systemctl stop "$svc" 2>/dev/null || true
+        sudo systemctl disable "$svc" 2>/dev/null || true
+        sudo systemctl mask "$svc" 2>/dev/null || true
+        echo "    [-] $svc stopped & masked"
     fi
 done
 
-echo "[+] Killing processes on ports 80 and 443..."
+# -----------------------------
+# 2️⃣ Kill ports 80 / 443
+# -----------------------------
+echo "[+] Clearing ports 80 and 443..."
 sudo fuser -k 80/tcp 2>/dev/null || true
 sudo fuser -k 443/tcp 2>/dev/null || true
 
-echo "[+] Updating system..."
-sudo apt update -y
+sleep 2
 
-echo "[+] Installing Nginx..."
-sudo apt install nginx -y
+# -----------------------------
+# 3️⃣ Check ports are free
+# -----------------------------
+echo "[+] Verifying ports..."
+if sudo ss -tulpn | grep -E ':80|:443'; then
+    echo "[✗] Ports still in use — aborting"
+    exit 1
+else
+    echo "[✓] Ports are free"
+fi
 
-echo "[+] Enabling Nginx..."
-sudo systemctl enable nginx
-sudo systemctl start nginx
+# -----------------------------
+# 4️⃣ Install Nginx if missing
+# -----------------------------
+if ! command -v nginx >/dev/null 2>&1; then
+    echo "[+] Installing Nginx..."
+    sudo apt update -y
+    sudo apt install nginx -y
+else
+    echo "[✓] Nginx already installed"
+fi
 
+# -----------------------------
+# 5️⃣ Create website files
+# -----------------------------
 echo "[+] Creating website directory..."
 sudo mkdir -p /var/www/cyberlab
 
-echo "[+] Creating index.html..."
 sudo tee /var/www/cyberlab/index.html > /dev/null << 'EOF'
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-    <meta charset="UTF-8">
     <title>CyberLab</title>
     <style>
         body {
-            background-color: #0d1117;
-            color: #00ff9c;
+            background:#0d1117;
+            color:#00ff9c;
             font-family: monospace;
-            text-align: center;
-            padding-top: 10%;
-        }
-        h1 {
-            font-size: 3em;
-        }
-        p {
-            font-size: 1.2em;
-            color: #c9d1d9;
+            text-align:center;
+            padding-top:10%;
         }
         .box {
-            border: 2px solid #00ff9c;
-            display: inline-block;
-            padding: 20px 40px;
-            border-radius: 10px;
+            border:2px solid #00ff9c;
+            display:inline-block;
+            padding:30px;
+            border-radius:10px;
         }
     </style>
 </head>
 <body>
-    <div class="box">
-        <h1>🚀 CyberLab Online</h1>
-        <p>Ubuntu | Nginx | Port 80</p>
-        <p>Hosted via Bash Script</p>
-        <p>Status: <span style="color:#00ff9c;">ACTIVE</span></p>
-    </div>
+<div class="box">
+<h1>🚀 CyberLab Online</h1>
+<p>Nginx | Port 80</p>
+<p>Status: ACTIVE</p>
+</div>
 </body>
 </html>
 EOF
 
-echo "[+] Creating Nginx config..."
+# -----------------------------
+# 6️⃣ Configure Nginx site
+# -----------------------------
+echo "[+] Configuring Nginx site..."
+
 sudo tee /etc/nginx/sites-available/cyberlab > /dev/null << 'EOF'
 server {
-    listen 80;
+    listen 80 default_server;
     server_name _;
 
     root /var/www/cyberlab;
@@ -99,19 +109,29 @@ server {
 }
 EOF
 
-echo "[+] Enabling site..."
 sudo ln -sf /etc/nginx/sites-available/cyberlab /etc/nginx/sites-enabled/
-
-echo "[+] Removing default site..."
 sudo rm -f /etc/nginx/sites-enabled/default
 
-echo "[+] Testing Nginx config..."
+# -----------------------------
+# 7️⃣ Test Nginx config
+# -----------------------------
+echo "[+] Testing Nginx configuration..."
 sudo nginx -t
 
-echo "[+] Reloading Nginx..."
-sudo systemctl reload nginx
+# -----------------------------
+# 8️⃣ Start Nginx safely
+# -----------------------------
+echo "[+] Starting Nginx..."
+sudo systemctl daemon-reload
+sudo systemctl restart nginx
+sudo systemctl enable nginx
 
+# -----------------------------
+# 9️⃣ Final status
+# -----------------------------
 IP=$(hostname -I | awk '{print $1}')
 
-echo "[✔] Website hosted successfully"
-echo "[✔] Open: http://$IP/"
+echo "=============================="
+echo "[✓] NGINX LAB READY"
+echo "[✓] Open: http://$IP/"
+echo "=============================="
