@@ -169,6 +169,23 @@ def _write_installed_marker(code: str, title: str):
 		pass
 	return False
 
+def _remove_installed_marker():
+	"""Remove any installed marker files."""
+	try:
+		if os.path.exists(_SYSTEM_MARKER):
+			try:
+				os.remove(_SYSTEM_MARKER)
+			except Exception:
+				pass
+		if os.path.exists(_USER_MARKER):
+			try:
+				os.remove(_USER_MARKER)
+			except Exception:
+				pass
+		return True
+	except Exception:
+		return False
+
 
 # Persisted labs config paths: prefer system-wide '/opt/lab/labs.json'
 # but fall back to the local `labs.json` beside this script when not writable.
@@ -1606,11 +1623,47 @@ class LabWindow(QMainWindow):
 
 	def reset_lab(self):
 		self.log("[+] Resetting lab environment")
-		# Prefer a packaged reset script under /opt/lab/reset.sh run non-interactively
+		# Determine if a lab is currently installed and perform per-lab reset when possible
+		marker = _read_installed_marker()
+		if marker and isinstance(marker, dict):
+			code = marker.get('code')
+			title = marker.get('title') or code
+			# try common per-lab reset script names under /opt/lab
+			candidates = [
+				os.path.join('/opt', 'lab', f'reset_{code}.sh'),
+				os.path.join('/opt', 'lab', f'uninstall_{code}.sh'),
+				os.path.join('/opt', 'lab', 'reset.sh'),
+			]
+			for p in candidates:
+				try:
+					if os.path.exists(p):
+						# ensure executable
+						try:
+							if os.name != 'nt':
+								st = os.stat(p)
+								os.chmod(p, st.st_mode | stat.S_IEXEC)
+						except Exception:
+							pass
+						# run reset and pass special arg so we can remove marker on success
+						threading.Thread(target=self._run_script_thread, args=(p, f'reset:{code}'), daemon=True).start()
+						return
+				except Exception:
+					continue
+			# no per-lab script found: try configured RESET_SCRIPT with reset arg (non-interactive)
+			try:
+				threading.Thread(target=self._run_script_thread, args=(RESET_SCRIPT, f'reset:{code}'), daemon=True).start()
+				return
+			except Exception:
+				pass
+			# as a last resort, try to run RESET_SCRIPT with elevation (may be interactive)
+			try:
+				self._run_as_admin(RESET_SCRIPT, f'reset:{code}')
+			except Exception:
+				self.log('[ERROR] Could not run reset script; please reset manually as root')
+			return
+		# No installed marker: fallback to global reset behaviour
 		opt_reset = '/opt/lab/reset.sh'
-		# If packaged reset exists, run it in background and stream output to UI
 		if os.path.exists(opt_reset):
-			# ensure executable bit on unix
 			try:
 				if os.name != 'nt':
 					st = os.stat(opt_reset)
@@ -1623,8 +1676,47 @@ class LabWindow(QMainWindow):
 		try:
 			self._run_as_admin(RESET_SCRIPT, "")
 		except Exception:
-			# fallback to background thread
 			threading.Thread(target=self._run_script_thread, args=(RESET_SCRIPT, ""), daemon=True).start()
+
+	def open_shell(self):
+		"""Try to launch a terminal emulator for interactive debugging.
+		Falls back to a user-visible message if no terminal found.
+		"""
+		# common terminal emulator launch commands (command, args...)
+		candidates = [
+			['gnome-terminal','--','/bin/bash','-i'],
+			['lxterminal','-e','/bin/bash'],
+			['x-terminal-emulator','-e','/bin/bash'],
+			['xterm','-e','/bin/bash'],
+			['konsole','-e','/bin/bash'],
+			['urxvt','-e','/bin/bash'],
+		]
+		# Windows fallbacks (Windows Terminal, PowerShell, cmd)
+		win_candidates = [
+			['wt','-w','0','new-tab','pwsh'],
+			['powershell.exe'],
+			['cmd.exe'],
+		]
+		for cmd in candidates:
+			try:
+				if shutil.which(cmd[0]):
+					subprocess.Popen(cmd, start_new_session=True)
+					self.log(f"[+] Launched terminal: {cmd[0]}")
+					return
+			except Exception as e:
+				self.log(f"[ERROR] Failed to launch {cmd[0]}: {e}")
+		# Try Windows candidates if on Windows
+		if sys.platform.startswith('win'):
+			for cmd in win_candidates:
+				try:
+					if shutil.which(cmd[0]):
+						subprocess.Popen(cmd, shell=False)
+						self.log(f"[+] Launched terminal: {cmd[0]}")
+						return
+				except Exception as e:
+					self.log(f"[ERROR] Failed to launch {cmd[0]}: {e}")
+		# no terminal emulator found
+		QMessageBox.information(self, 'No terminal', 'No terminal emulator found on system. Please install xterm or run a shell via SSH for debugging.')
 
 	def cancel_current(self):
 		if not getattr(self, 'current_proc', None):
@@ -1637,21 +1729,6 @@ class LabWindow(QMainWindow):
 			threading.Timer(3.0, lambda: proc.kill() if proc.poll() is None else None).start()
 		except Exception as e:
 			self.log(f"[ERROR] Failed to terminate: {e}")
-
-	def open_shell(self):
-		"""Try to launch a terminal emulator for interactive debugging.
-		Falls back to a user-visible message if no terminal found.
-		"""
-		# common terminal emulator launch commands (command, args...)
-		# Try common terminal emulators, prefer launching /bin/bash directly.
-		candidates = [
-			['gnome-terminal','--','/bin/bash','-i'],
-			['lxterminal','-e','/bin/bash'],
-			['x-terminal-emulator','-e','/bin/bash'],
-			['xterm','-e','/bin/bash'],
-			['konsole','-e','/bin/bash'],
-			['urxvt','-e','/bin/bash'],
-		]
 		# Windows fallbacks (Windows Terminal, PowerShell, cmd)
 		win_candidates = [
 			['wt','-w','0','new-tab','pwsh'],
