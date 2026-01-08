@@ -189,21 +189,6 @@ def save_persisted_labs():
 	Python source file. A timestamped backup of the file is written first.
 	"""
 	try:
-		# Also write a local JSON backup to ensure persistence across reboots/sync
-		try:
-			labs_out = {k: [v[0], v[1]] for k, v in LABS.items()}
-			installers_out = dict(LAB_INSTALLERS)
-			difficulties_out = dict(LAB_DIFFICULTY)
-			payload = {'labs': labs_out, 'installers': installers_out, 'difficulties': difficulties_out}
-			# write local backup first (best-effort)
-			try:
-				with open(_LOCAL_LABS_CONFIG, 'w', encoding='utf-8') as _f:
-					json.dump(payload, _f, indent=2, ensure_ascii=False)
-				sys.stderr.write(f"[INFO] Wrote local labs backup to {_LOCAL_LABS_CONFIG}\n")
-			except Exception as e_local:
-				sys.stderr.write(f"[WARN] Could not write local labs backup: {e_local}\n")
-		except Exception:
-			pass
 		src = os.path.abspath(__file__)
 		# create a backup copy
 		bak = f"{src}.bak.{int(time.time())}"
