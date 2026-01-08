@@ -107,6 +107,9 @@ LABS = {
 	"Web – XSS": ("web_xss", "Learn about XSS (Cross-Site Scripting) and how to defend against it."),
 }
 
+# Optional per-lab difficulty mapping (title -> 'Easy'|'Medium'|'Hard')
+LAB_DIFFICULTY = {}
+
 # Default scripts (can be overridden by env vars)
 INSTALL_SCRIPT = os.environ.get("INSTALL_SCRIPT", "/usr/local/bin/install_lab.sh")
 RESET_SCRIPT = os.environ.get("RESET_SCRIPT", "/opt/lab/reset_lab.sh")
@@ -123,6 +126,48 @@ LAB_INSTALLERS = {
 	# Example: 'web_upload': 'https://example.com/labs/web_upload/install.sh',
 	# 'sudo_privesc': None,  # uses INSTALL_SCRIPT with arg
 }
+
+# Installed marker paths (system then user fallback)
+_SYSTEM_MARKER = os.path.join('/opt', 'lab', 'installed_lab.json')
+_USER_MARKER_DIR = os.path.join(os.path.expanduser('~'), '.local', 'opt', 'lab')
+_USER_MARKER = os.path.join(_USER_MARKER_DIR, 'installed_lab.json')
+
+def _read_installed_marker():
+	"""Return installed marker dict or None."""
+	try:
+		if os.path.exists(_SYSTEM_MARKER):
+			with open(_SYSTEM_MARKER, 'r', encoding='utf-8') as f:
+				return json.load(f)
+		if os.path.exists(_USER_MARKER):
+			with open(_USER_MARKER, 'r', encoding='utf-8') as f:
+				return json.load(f)
+	except Exception:
+		pass
+	return None
+
+def _write_installed_marker(code: str, title: str):
+	"""Write installed marker; prefer system path, else user path."""
+	payload = {'code': code, 'title': title, 'installed_at': int(time.time())}
+	try:
+		# try system path first
+		try:
+			os.makedirs(os.path.dirname(_SYSTEM_MARKER), exist_ok=True)
+			with open(_SYSTEM_MARKER, 'w', encoding='utf-8') as f:
+				json.dump(payload, f)
+			return True
+		except Exception:
+			pass
+		# fallback to user path
+		try:
+			os.makedirs(_USER_MARKER_DIR, exist_ok=True)
+			with open(_USER_MARKER, 'w', encoding='utf-8') as f:
+				json.dump(payload, f)
+			return True
+		except Exception:
+			pass
+	except Exception:
+		pass
+	return False
 
 
 # Persisted labs config paths: prefer system-wide '/opt/lab/labs.json'
@@ -147,6 +192,7 @@ def load_persisted_labs():
 			data = json.load(f)
 		labs = data.get('labs', {})
 		installers = data.get('installers', {})
+		difficulties = data.get('difficulties', {})
 		# labs stored as title -> [code, desc]
 		for title, val in labs.items():
 			try:
@@ -161,6 +207,12 @@ def load_persisted_labs():
 				LAB_INSTALLERS[k] = v
 			else:
 				LAB_INSTALLERS.pop(k, None)
+		# difficulties: title -> difficulty
+		for t, dv in difficulties.items():
+			if dv:
+				LAB_DIFFICULTY[t] = dv
+			else:
+				LAB_DIFFICULTY.pop(t, None)
 	except Exception:
 		# don't fail startup on corrupted config
 		sys.stderr.write('[WARN] Failed to load persisted labs config\n')
@@ -175,7 +227,8 @@ def save_persisted_labs():
 	try:
 		labs_out = {k: [v[0], v[1]] for k, v in LABS.items()}
 		installers_out = dict(LAB_INSTALLERS)
-		payload = {'labs': labs_out, 'installers': installers_out}
+		difficulties_out = dict(LAB_DIFFICULTY)
+		payload = {'labs': labs_out, 'installers': installers_out, 'difficulties': difficulties_out}
 		# Attempt system write first
 		try:
 			os.makedirs(_SYSTEM_LABS_DIR, exist_ok=True)
@@ -393,17 +446,20 @@ class CardWidget(QFrame):
 		bottom_row = QHBoxLayout()
 		bottom_row.addStretch()
 		# difficulty badge (Easy/Medium/Hard)
-		# Determine difficulty from description text if present, otherwise default to Easy
+		# Determine difficulty: prefer explicit mapping in LAB_DIFFICULTY, else fall back to description scanning
 		diff = 'Easy'
 		try:
-			if isinstance(self.desc, str):
-				d = self.desc.lower()
-				if 'hard' in d:
-					diff = 'Hard'
-				elif 'medium' in d:
-					diff = 'Medium'
-				elif 'easy' in d:
-					diff = 'Easy'
+			if self.name in LAB_DIFFICULTY:
+				diff = LAB_DIFFICULTY.get(self.name, 'Easy')
+			else:
+				if isinstance(self.desc, str):
+					d = self.desc.lower()
+					if 'hard' in d:
+						diff = 'Hard'
+					elif 'medium' in d:
+						diff = 'Medium'
+					elif 'easy' in d:
+						diff = 'Easy'
 		except Exception:
 			pass
 		self._badge = QLabel(diff)
@@ -1074,6 +1130,24 @@ class LabWindow(QMainWindow):
 					proc.wait()
 					rc = proc.returncode
 					self.output_signal.emit(f"[+] Finished (exit code {rc})")
+					# If this was an installer run (arg set to lab code) and it succeeded, record installed marker
+					try:
+						if rc == 0 and arg:
+							# attempt to resolve title from LABS mapping
+							title = None
+							for t, v in LABS.items():
+								try:
+									if v and v[0] == arg:
+										title = t
+								except Exception:
+									pass
+							if not title:
+								title = arg
+							_written = _write_installed_marker(arg, title)
+							if _written:
+								self.output_signal.emit(f"[+] Recorded installed lab: {title} ({arg})")
+					except Exception:
+						pass
 				except FileNotFoundError:
 					self.output_signal.emit(f"[ERROR] Script not found: {script_path}")
 				except Exception as e:
@@ -1155,9 +1229,9 @@ class LabWindow(QMainWindow):
 			except Exception as e:
 				self.output_signal.emit(f"[WARN] chmod failed: {e}")
 
-			# run in background and stream
+			# run in background and stream; pass the lab_code as arg so completion can record installed marker
 			self.output_signal.emit(f"[+] Executing downloaded script in background: {dest}")
-			self._run_script_thread(dest, "")
+			self._run_script_thread(dest, lab_code or "")
 		except Exception as e:
 			self.output_signal.emit(f"[ERROR] Failed to download/execute {url}: {e}")
 			self.set_busy(False)
@@ -1169,6 +1243,24 @@ class LabWindow(QMainWindow):
 			return
 		lab = self.selected_lab
 		self.log(f"[+] Installing lab: {lab}")
+		# If another lab is already installed, require reset first
+		try:
+			marker = _read_installed_marker()
+			if marker and marker.get('code') and marker.get('code') != lab:
+				msg = (
+					f"An installed lab was detected: {marker.get('title')} ({marker.get('code')}).\n\n"
+					"To install a different lab, please run Reset / Cleanup first.\n\n"
+					"Click 'Reset Now' to run cleanup, or 'Cancel' to abort the install."
+				)
+				res = QMessageBox.question(self, 'Existing lab found', msg, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+				if res == QMessageBox.StandardButton.Yes:
+					# run reset and abort install; user can retry after reset
+					self.reset_lab()
+					return
+				else:
+					return
+		except Exception:
+			pass
 		# Per-lab installers: if a URL is configured for this lab, download and run it
 		installer = LAB_INSTALLERS.get(lab)
 		if installer:
@@ -1646,23 +1738,32 @@ class ManageLabsDialog(QMessageBox):
 		self._orig_code = code
 		self.title_in.setText(title)
 		self.code_in.setText(code)
-		# detect a trailing difficulty marker like '(Easy)' and set selector
-		if isinstance(desc, str):
-			m = re.search(r"\(?\s*(easy|medium|hard)\s*\)?\s*$", desc, re.I)
-			if m:
-				diff_val = m.group(1).capitalize()
-				try:
-					self.diff_in.setCurrentText(diff_val)
-				except Exception:
-					# fallback: set index (0 == New / default)
-					if diff_val.lower() == 'easy':
-						self.diff_in.setCurrentIndex(1)
-					elif diff_val.lower() == 'medium':
-						self.diff_in.setCurrentIndex(2)
-					elif diff_val.lower() == 'hard':
-						self.diff_in.setCurrentIndex(3)
-				# remove the marker from the visible description field
-				desc = re.sub(r"\(?\s*(easy|medium|hard)\s*\)?\s*$", '', desc, flags=re.I).strip()
+		# Set difficulty from explicit mapping if present, else fall back to parsing
+		diff_used = None
+		try:
+			if title in LAB_DIFFICULTY:
+				diff_used = LAB_DIFFICULTY.get(title)
+			else:
+				# legacy: parse trailing marker from description
+				if isinstance(desc, str):
+					m = re.search(r"\(?\s*(easy|medium|hard)\s*\)?\s*$", desc, re.I)
+					if m:
+						diff_used = m.group(1).capitalize()
+						# strip marker from visible description
+						desc = re.sub(r"\(?\s*(easy|medium|hard)\s*\)?\s*$", '', desc, flags=re.I).strip()
+		except Exception:
+			diff_used = None
+		if diff_used:
+			try:
+				self.diff_in.setCurrentText(diff_used)
+			except Exception:
+				# best-effort index mapping
+				if diff_used.lower() == 'easy':
+					self.diff_in.setCurrentIndex(1)
+				elif diff_used.lower() == 'medium':
+					self.diff_in.setCurrentIndex(2)
+				elif diff_used.lower() == 'hard':
+					self.diff_in.setCurrentIndex(3)
 		self.desc_in.setText(desc)
 		self.url_in.setText(LAB_INSTALLERS.get(code, ''))
 		# difficulty may have been parsed from the description above
@@ -1691,12 +1792,18 @@ class ManageLabsDialog(QMessageBox):
 						del LABS[k]
 					except Exception:
 						pass
-			# Ensure difficulty is persisted by appending a marker like ' (Easy)'
-			# Remove any existing trailing difficulty marker then append the selected one.
+			# Persist description unchanged and store difficulty separately
 			clean_desc = desc or ''
 			clean_desc = re.sub(r"\(?\s*(easy|medium|hard)\s*\)?\s*$", '', clean_desc, flags=re.I).strip()
-			final_desc = (clean_desc + ' ' + f'({diff})').strip() if diff else clean_desc
-			LABS[title] = (code, final_desc)
+			LABS[title] = (code, clean_desc)
+			# store difficulty mapping (use default 'Easy' if empty)
+			try:
+				if diff:
+					LAB_DIFFICULTY[title] = diff
+				else:
+					LAB_DIFFICULTY.pop(title, None)
+			except Exception:
+				pass
 			if url:
 				LAB_INSTALLERS[code] = url
 			else:
@@ -1951,4 +2058,3 @@ def main():
 
 if __name__ == '__main__':
 	main()
-
