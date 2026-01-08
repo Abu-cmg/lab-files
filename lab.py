@@ -1,6 +1,7 @@
 import os
 import sys
 import threading
+import re
 
 # VM / rendering safety: prefer CPU raster painting in VMs to avoid partial redraws
 # Only enable these aggressive fallbacks when running on Linux VMs or when
@@ -123,48 +124,71 @@ LAB_INSTALLERS = {
 	# 'sudo_privesc': None,  # uses INSTALL_SCRIPT with arg
 }
 
-# Persisted labs config path (stored next to this script)
-_LABS_CONFIG = os.path.join(os.path.dirname(__file__), 'labs.json')
+
+# Persisted labs config paths: prefer system-wide '/opt/lab/labs.json'
+# but fall back to the local `labs.json` beside this script when not writable.
+_SYSTEM_LABS_DIR = '/opt/lab'
+_SYSTEM_LABS_CONFIG = os.path.join(_SYSTEM_LABS_DIR, 'labs.json')
+_LOCAL_LABS_CONFIG = os.path.join(os.path.dirname(__file__), 'labs.json')
 
 def load_persisted_labs():
-	"""Load persisted labs from `_LABS_CONFIG` and merge into LABS/LAB_INSTALLERS.
+	"""Load persisted labs from system path first, then local fallback.
 	Persisted entries will override defaults when keys/codes collide.
 	"""
 	try:
-		if os.path.exists(_LABS_CONFIG):
-			with open(_LABS_CONFIG, 'r', encoding='utf-8') as f:
-				data = json.load(f)
-			labs = data.get('labs', {})
-			installers = data.get('installers', {})
-			# labs stored as title -> [code, desc]
-			for title, val in labs.items():
-				try:
-					code, desc = val[0], val[1] if len(val) > 1 else ''
-				except Exception:
-					continue
-				# replace or add
-				LABS[title] = (code, desc)
-			# installers: code -> url/path
-			for k, v in installers.items():
-				if v:
-					LAB_INSTALLERS[k] = v
-				else:
-					LAB_INSTALLERS.pop(k, None)
+		path = None
+		if os.path.exists(_SYSTEM_LABS_CONFIG):
+			path = _SYSTEM_LABS_CONFIG
+		elif os.path.exists(_LOCAL_LABS_CONFIG):
+			path = _LOCAL_LABS_CONFIG
+		if not path:
+			return
+		with open(path, 'r', encoding='utf-8') as f:
+			data = json.load(f)
+		labs = data.get('labs', {})
+		installers = data.get('installers', {})
+		# labs stored as title -> [code, desc]
+		for title, val in labs.items():
+			try:
+				code, desc = val[0], val[1] if len(val) > 1 else ''
+			except Exception:
+				continue
+			# replace or add
+			LABS[title] = (code, desc)
+		# installers: code -> url/path
+		for k, v in installers.items():
+			if v:
+				LAB_INSTALLERS[k] = v
+			else:
+				LAB_INSTALLERS.pop(k, None)
 	except Exception:
 		# don't fail startup on corrupted config
 		sys.stderr.write('[WARN] Failed to load persisted labs config\n')
 
+
 def save_persisted_labs():
-	"""Serialize current LABS and LAB_INSTALLERS to `_LABS_CONFIG`.
-	LABS is stored as title -> [code, desc]; LAB_INSTALLERS as code -> url
+	"""Serialize current LABS and LAB_INSTALLERS.
+	Try to write system-wide config to `/opt/lab/labs.json` first. If that
+	fails (permission or other), fall back to the local `labs.json` beside the
+	script and emit a warning to stderr.
 	"""
 	try:
 		labs_out = {k: [v[0], v[1]] for k, v in LABS.items()}
 		installers_out = dict(LAB_INSTALLERS)
 		payload = {'labs': labs_out, 'installers': installers_out}
-		with open(_LABS_CONFIG, 'w', encoding='utf-8') as f:
+		# Attempt system write first
+		try:
+			os.makedirs(_SYSTEM_LABS_DIR, exist_ok=True)
+			with open(_SYSTEM_LABS_CONFIG, 'w', encoding='utf-8') as f:
+				json.dump(payload, f, indent=2, ensure_ascii=False)
+			sys.stderr.write(f'[INFO] Saved labs config to {_SYSTEM_LABS_CONFIG}\n')
+			return
+		except Exception as e_sys:
+			sys.stderr.write(f'[WARN] Could not save to {_SYSTEM_LABS_CONFIG}: {e_sys}\n')
+		# Fallback to local path
+		with open(_LOCAL_LABS_CONFIG, 'w', encoding='utf-8') as f:
 			json.dump(payload, f, indent=2, ensure_ascii=False)
-		sys.stderr.write(f'[INFO] Saved labs config to {_LABS_CONFIG}\n')
+		sys.stderr.write(f'[INFO] Saved labs config to {_LOCAL_LABS_CONFIG}\n')
 	except Exception as e:
 		sys.stderr.write(f'[WARN] Failed to save labs config: {e}\n')
 
@@ -369,8 +393,28 @@ class CardWidget(QFrame):
 		bottom_row = QHBoxLayout()
 		bottom_row.addStretch()
 		# difficulty badge (Easy/Medium/Hard)
-		self._badge = QLabel("Easy")
-		self._badge.setStyleSheet("background:#0b3b6f; color:#ffffff; padding:6px 8px; border-radius:8px; font-size:10px; font-weight:700;")
+		# Determine difficulty from description text if present, otherwise default to Easy
+		diff = 'Easy'
+		try:
+			if isinstance(self.desc, str):
+				d = self.desc.lower()
+				if 'hard' in d:
+					diff = 'Hard'
+				elif 'medium' in d:
+					diff = 'Medium'
+				elif 'easy' in d:
+					diff = 'Easy'
+		except Exception:
+			pass
+		self._badge = QLabel(diff)
+		# Color mapping: Easy = blue, Medium = yellow, Hard = red
+		_badge_colors = {
+			'Easy': '#0b3b6f',
+			'Medium': '#c19a0b',
+			'Hard': '#c0392b',
+		}
+		bg = _badge_colors.get(diff, '#0b3b6f')
+		self._badge.setStyleSheet(f"background:{bg}; color:#ffffff; padding:6px 8px; border-radius:8px; font-size:10px; font-weight:700;")
 		self._badge.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
 		bottom_row.addWidget(self._badge)
 		v.addLayout(bottom_row)
@@ -814,6 +858,16 @@ class LabWindow(QMainWindow):
 		try:
 			self.update_btn = QPushButton("Update")
 			left.addWidget(self.update_btn)
+			# Give the Update button a purple -> pink gradient to match Install button
+			try:
+				self.update_btn.setStyleSheet(
+					"QPushButton{background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #7b2cbf, stop:1 #ff66b3);"
+					" color:#ffffff; border:1px solid rgba(255,255,255,0.04); border-radius:8px; padding:8px 12px;}"
+					"QPushButton:hover{border:1px solid #ff8ed6;}"
+					"QPushButton:disabled{background:#5a3a5a; color:#6a6a6a;}"
+				)
+			except Exception:
+				pass
 		except Exception:
 			pass
 		# fullscreen / maximize toggle
@@ -1592,9 +1646,26 @@ class ManageLabsDialog(QMessageBox):
 		self._orig_code = code
 		self.title_in.setText(title)
 		self.code_in.setText(code)
+		# detect a trailing difficulty marker like '(Easy)' and set selector
+		if isinstance(desc, str):
+			m = re.search(r"\(?\s*(easy|medium|hard)\s*\)?\s*$", desc, re.I)
+			if m:
+				diff_val = m.group(1).capitalize()
+				try:
+					self.diff_in.setCurrentText(diff_val)
+				except Exception:
+					# fallback: set index (0 == New / default)
+					if diff_val.lower() == 'easy':
+						self.diff_in.setCurrentIndex(1)
+					elif diff_val.lower() == 'medium':
+						self.diff_in.setCurrentIndex(2)
+					elif diff_val.lower() == 'hard':
+						self.diff_in.setCurrentIndex(3)
+				# remove the marker from the visible description field
+				desc = re.sub(r"\(?\s*(easy|medium|hard)\s*\)?\s*$", '', desc, flags=re.I).strip()
 		self.desc_in.setText(desc)
 		self.url_in.setText(LAB_INSTALLERS.get(code, ''))
-		# difficulty isn't persisted; leave at default
+		# difficulty may have been parsed from the description above
 
 	def _on_accept(self):
 		title = self.title_in.text().strip()
@@ -1620,7 +1691,12 @@ class ManageLabsDialog(QMessageBox):
 						del LABS[k]
 					except Exception:
 						pass
-			LABS[title] = (code, desc or f'({diff})')
+			# Ensure difficulty is persisted by appending a marker like ' (Easy)'
+			# Remove any existing trailing difficulty marker then append the selected one.
+			clean_desc = desc or ''
+			clean_desc = re.sub(r"\(?\s*(easy|medium|hard)\s*\)?\s*$", '', clean_desc, flags=re.I).strip()
+			final_desc = (clean_desc + ' ' + f'({diff})').strip() if diff else clean_desc
+			LABS[title] = (code, final_desc)
 			if url:
 				LAB_INSTALLERS[code] = url
 			else:
@@ -1875,4 +1951,4 @@ def main():
 
 if __name__ == '__main__':
 	main()
-#abubakarwas here
+
