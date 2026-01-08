@@ -1177,24 +1177,39 @@ class LabWindow(QMainWindow):
 					# If this was an installer run (arg set to lab code) and it succeeded, record installed marker
 					try:
 						if rc == 0 and arg:
-							# attempt to resolve title from LABS mapping
-							title = None
-							for t, v in LABS.items():
-								try:
-									if v and v[0] == arg:
-										title = t
-								except Exception:
-									pass
-							if not title:
-								title = arg
-							_written = _write_installed_marker(arg, title)
-							if _written:
-								self.output_signal.emit(f"[+] Recorded installed lab: {title} ({arg})")
-								# refresh UI in the main thread to show target IP
-								try:
-									QTimer.singleShot(0, self._refresh_target_ip_visibility)
-								except Exception:
-									pass
+							# handle reset runs (arg like 'reset:<code>') vs installer runs
+							try:
+								if isinstance(arg, str) and arg.startswith('reset:'):
+									rcode = arg.split(':', 1)[1] if ':' in arg else arg
+									_removed = _remove_installed_marker()
+									if _removed:
+										self.output_signal.emit(f"[+] Removed installed marker for: {rcode}")
+										try:
+											QTimer.singleShot(0, self._refresh_target_ip_visibility)
+										except Exception:
+											pass
+								else:
+									# installer run (arg is lab code) -> write marker
+									code = arg
+									# attempt to resolve title from LABS mapping
+									title = None
+									for t, v in LABS.items():
+										try:
+											if v and v[0] == code:
+												title = t
+										except Exception:
+											pass
+									if not title:
+										title = code
+									_written = _write_installed_marker(code, title)
+									if _written:
+										self.output_signal.emit(f"[+] Recorded installed lab: {title} ({code})")
+										try:
+											QTimer.singleShot(0, self._refresh_target_ip_visibility)
+										except Exception:
+											pass
+							except Exception:
+								pass
 					except Exception:
 						pass
 				except FileNotFoundError:
