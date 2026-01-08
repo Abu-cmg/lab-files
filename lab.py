@@ -114,7 +114,7 @@ LABS = {'Linux – Sudo PrivEsc': ('sudo_privesc', 'Gain root via sudo misconfig
  'zc': ('za', 'sad')}
 
 # Optional per-lab difficulty mapping (title -> 'Easy'|'Medium'|'Hard')
-LAB_DIFFICULTY = {'Linux – Sudo PrivEsc': 'Hard', 'dsfsd': 'Medium', 'zc': 'Easy'}
+LAB_DIFFICULTY = {'Linux – Sudo PrivEsc': 'Hard', 'dsfsd': 'Medium', 'sdk': 'Easy', 'zc': 'Easy'}
 
 # Default scripts (can be overridden by env vars)
 INSTALL_SCRIPT = os.environ.get("INSTALL_SCRIPT", "/usr/local/bin/install_lab.sh")
@@ -130,7 +130,7 @@ LAB_INSTALLERS = {'asda': 'asd',
  'asds': 'asdsa',
  'fsdfd': 'sdf',
  'net': 'https://github.com/Abu-cmg/lab-files/blob/main/red.sh',
- 'sd': 'sadasd',
+ 'sd': 'https://github.com/Abu-cmg/lab-files/blob/main/color1.sh',
  'sudo_privesc': 'https://github.com/Abu-cmg/lab-files/blob/main/color1.sh',
  'web_sqli': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/lab_web.sh.sh',
  'web_upload': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/upload.sh',
