@@ -803,6 +803,13 @@ class LabWindow(QMainWindow):
 				except Exception:
 					pass
 				ctrl_layout.addWidget(self._target_ip_card)
+				# Show target IP only if a lab is currently installed
+				try:
+					marker = _read_installed_marker()
+					if not marker:
+						self._target_ip_card.setVisible(False)
+				except Exception:
+					pass
 				try:
 					ctrl_layout.setAlignment(self._target_ip_card, Qt.AlignmentFlag.AlignTop)
 					self._target_ip_card.raise_()
@@ -1074,6 +1081,26 @@ class LabWindow(QMainWindow):
 			except Exception:
 				pass
 
+	def _refresh_target_ip_visibility(self):
+		"""Show/hide the target IP UI based on whether a lab is installed."""
+		try:
+			marker = _read_installed_marker()
+			visible = bool(marker)
+			# update card visibility
+			try:
+				self._target_ip_card.setVisible(visible)
+			except Exception:
+				pass
+			# update label text from env if visible
+			try:
+				if visible:
+					ip = os.environ.get('TARGET_IP') or '...'
+					self._target_ip_text.setText(f"IP: {ip}")
+			except Exception:
+				pass
+		except Exception:
+			pass
+
 	def _on_card_click(self, code, frame: 'CardWidget'):
 		# clear previous selections
 		for c in self.cards:
@@ -1146,6 +1173,11 @@ class LabWindow(QMainWindow):
 							_written = _write_installed_marker(arg, title)
 							if _written:
 								self.output_signal.emit(f"[+] Recorded installed lab: {title} ({arg})")
+								# refresh UI in the main thread to show target IP
+								try:
+									QTimer.singleShot(0, self._refresh_target_ip_visibility)
+								except Exception:
+									pass
 					except Exception:
 						pass
 				except FileNotFoundError:
