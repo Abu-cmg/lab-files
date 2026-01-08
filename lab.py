@@ -521,6 +521,8 @@ class LabWindow(QMainWindow):
 		self.setWindowTitle("Vulnerable Lab Selector")
 		self.resize(1000, 700)
 		self.selected_lab = None
+		# Track which lab has been installed; prevents installing another until reset
+		self._installed_lab = None
 
 		# Central widget and main layout
 		# central widget should be a member and allowed to expand
@@ -594,6 +596,7 @@ class LabWindow(QMainWindow):
 		# between the markers: MANAGE_UI_BLOCK START / END
 		self.manage_btn = QPushButton("Manage Labs")
 		left.addWidget(self.manage_btn)
+
 		self.cancel_btn.setEnabled(False)
 		left.addWidget(QLabel("Actions", alignment=Qt.AlignmentFlag.AlignLeft))
 		left.addWidget(self.install_btn)
@@ -753,12 +756,34 @@ class LabWindow(QMainWindow):
 		# add the banner at the very top (banner will center its content internally)
 		wrapper.addWidget(banner)
 
+		# Add an app title under the banner
+		try:
+			title_lbl = QLabel("HKQ's Practice Labs")
+			title_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+			title_lbl.setStyleSheet('color:#ff66b3; font-size:18px; font-weight:800; padding:6px 0;')
+			wrapper.addWidget(title_lbl)
+		except Exception:
+			pass
+
+		# Initialize installed-state display
+		try:
+			self._set_installed_lab(getattr(self, '_installed_lab', None))
+		except Exception:
+			pass
+
 		# Top-right window controls (maximize/restore) - small, Kali-like button
 		try:
 			controls = QWidget()
 			controls.setFixedHeight(34)
 			ctrl_layout = QHBoxLayout()
 			ctrl_layout.setContentsMargins(8, 4, 8, 4)
+			# Current installed lab display (top-left)
+			try:
+				self.current_lab_lbl = QLabel("Current Lab: None")
+				self.current_lab_lbl.setStyleSheet('color:#ff66b3; font-weight:700; padding:6px 0;')
+				ctrl_layout.addWidget(self.current_lab_lbl)
+			except Exception:
+				pass
 			ctrl_layout.addStretch()
 			# Target IP label (top-right). Shows detected IP or uses TARGET_IP env override.
 			try:
@@ -768,8 +793,8 @@ class LabWindow(QMainWindow):
 			# small grey card containing the target IP
 			try:
 				self._target_ip_text = QLabel(f"IP: {ip}")
-				# larger neon text for readability
-				self._target_ip_text.setStyleSheet('color:#a6ffb0; font-size:14px; font-weight:700;')
+				# larger red text for visibility
+				self._target_ip_text.setStyleSheet('color:#ff3b3b; font-size:14px; font-weight:700;')
 				self._target_ip_text.setAlignment(Qt.AlignmentFlag.AlignVCenter)
 				self._target_ip_card = QFrame()
 				self._target_ip_card.setObjectName('target_ip_card')
@@ -789,6 +814,11 @@ class LabWindow(QMainWindow):
 				except Exception:
 					pass
 				ctrl_layout.addWidget(self._target_ip_card)
+				# Only show target IP when a lab is installed
+				try:
+					self._target_ip_card.setVisible(bool(getattr(self, '_installed_lab', None)))
+				except Exception:
+					pass
 				try:
 					ctrl_layout.setAlignment(self._target_ip_card, Qt.AlignmentFlag.AlignTop)
 					self._target_ip_card.raise_()
@@ -797,13 +827,14 @@ class LabWindow(QMainWindow):
 			except Exception:
 				# fallback to plain label
 				self.target_ip_lbl = QLabel(f"Target IP: {ip}")
-				self.target_ip_lbl.setStyleSheet('color:#e6e6e6; font-size:10px; padding-right:8px;')
+				# fallback label should also be red
+				self.target_ip_lbl.setStyleSheet('color:#ff3b3b; font-size:10px; padding-right:8px;')
+				try:
+					self.target_ip_lbl.setVisible(bool(getattr(self, '_installed_lab', None)))
+				except Exception:
+					pass
 				ctrl_layout.addWidget(self.target_ip_lbl)
-			self.fullscreen_btn = QPushButton('\u26F6')
-			self.fullscreen_btn.setFixedSize(32, 28)
-			self.fullscreen_btn.setToolTip('Toggle maximize/restore (F11)')
-			self.fullscreen_btn.setStyleSheet('QPushButton{background:transparent; color:#e6e6e6; border:1px solid rgba(255,255,255,0.04); border-radius:6px;} QPushButton:hover{border:1px solid #00ff99;}')
-			ctrl_layout.addWidget(self.fullscreen_btn)
+			# fullscreen toggle button removed per user request
 			controls.setLayout(ctrl_layout)
 			wrapper.addWidget(controls)
 			# start IP detection timer (tries to detect primary outbound IP)
@@ -914,9 +945,7 @@ class LabWindow(QMainWindow):
 			pass
 		# fullscreen / maximize toggle
 		try:
-			self.fullscreen_btn.clicked.connect(self.toggle_maximize)
-			# F11 shortcut to toggle maximize/restore. Some PyQt builds may not expose QShortcut,
-			# so use an application QAction as a reliable fallback for a global shortcut.
+			# F11 shortcut to toggle maximize/restore. Use an application QAction as a reliable fallback.
 			a = QAction(self)
 			a.setShortcut(QKeySequence('F11'))
 			a.triggered.connect(self.toggle_maximize)
@@ -1205,7 +1234,65 @@ class LabWindow(QMainWindow):
 			self.set_busy(False)
 
 	# Button actions (stubs that mirror behavior from tkinter)
+	def _set_installed_lab(self, lab: str | None):
+		"""Update internal installed-state and refresh UI status/button state."""
+		try:
+			self._installed_lab = lab
+			if lab:
+				try:
+					self.install_btn.setEnabled(False)
+				except Exception:
+					pass
+				# show installed lab in status label
+				try:
+					self.status.setText(f"Installed: {lab}")
+				except Exception:
+					pass
+				# show target IP widgets when a lab is installed
+				try:
+					if hasattr(self, '_target_ip_card'):
+						self._target_ip_card.setVisible(True)
+					if hasattr(self, 'target_ip_lbl'):
+						self.target_ip_lbl.setVisible(True)
+				except Exception:
+					pass
+				# update current lab label
+				try:
+					if hasattr(self, 'current_lab_lbl'):
+						self.current_lab_lbl.setText(f"Current Lab: {lab}")
+				except Exception:
+					pass
+			else:
+				try:
+					self.install_btn.setEnabled(True)
+				except Exception:
+					pass
+				try:
+					self.status.setText("Installed: None")
+				except Exception:
+					pass
+				# hide target IP widgets when nothing installed
+				try:
+					if hasattr(self, '_target_ip_card'):
+						self._target_ip_card.setVisible(False)
+					if hasattr(self, 'target_ip_lbl'):
+						self.target_ip_lbl.setVisible(False)
+				except Exception:
+					pass
+				# update current lab label to None
+				try:
+					if hasattr(self, 'current_lab_lbl'):
+						self.current_lab_lbl.setText("Current Lab: None")
+				except Exception:
+					pass
+		except Exception:
+			pass
+
 	def install_lab(self):
+		# Prevent installing a new lab if one is already installed
+		if getattr(self, '_installed_lab', None):
+			QMessageBox.information(self, 'Reset required', 'A lab is already installed. Reset the lab before installing another.')
+			return
 		if not self.selected_lab:
 			self.log("[!] No lab selected")
 			return
@@ -1217,10 +1304,19 @@ class LabWindow(QMainWindow):
 			# If installer looks like a URL, download and execute in background
 			if installer.startswith('http://') or installer.startswith('https://'):
 				threading.Thread(target=self._download_and_execute_url, args=(installer, lab), daemon=True).start()
+				# mark as installed and disable further installs until reset
+				try:
+					self._set_installed_lab(lab)
+				except Exception:
+					pass
 				return
 			# otherwise fall back to running configured installer path directly
 			try:
 				threading.Thread(target=self._run_script_thread, args=(installer, lab), daemon=True).start()
+				try:
+					self._set_installed_lab(lab)
+				except Exception:
+					pass
 				return
 			except Exception:
 				pass
@@ -1228,6 +1324,10 @@ class LabWindow(QMainWindow):
 		# to avoid blocking the UI and causing black screens.
 		try:
 			threading.Thread(target=self._run_as_admin, args=(INSTALL_SCRIPT, lab), daemon=True).start()
+			try:
+				self._set_installed_lab(lab)
+			except Exception:
+				pass
 		except Exception:
 			# fallback to non-interactive background thread
 			threading.Thread(target=self._run_script_thread, args=(INSTALL_SCRIPT, lab), daemon=True).start()
@@ -1524,6 +1624,11 @@ class LabWindow(QMainWindow):
 
 	def reset_lab(self):
 		self.log("[+] Resetting lab environment")
+		# Clear installed-state to allow new installs once reset is requested
+		try:
+			self._set_installed_lab(None)
+		except Exception:
+			pass
 		# Prefer a packaged reset script under /opt/lab/reset.sh run non-interactively
 		opt_reset = '/opt/lab/reset.sh'
 		# If packaged reset exists, run it in background and stream output to UI
@@ -1604,16 +1709,10 @@ class LabWindow(QMainWindow):
 			if self.isMaximized():
 				self.showNormal()
 				# update button appearance if desired
-				try:
-					self.fullscreen_btn.setText('\u26F6')
-				except Exception:
-					pass
+				# fullscreen button removed; no UI text to update
 			else:
 				self.showMaximized()
-				try:
-					self.fullscreen_btn.setText('\u2752')
-				except Exception:
-					pass
+				# fullscreen button removed; no UI text to update
 		except Exception as e:
 			self.log(f"[ERROR] Toggle maximize failed: {e}")
 
