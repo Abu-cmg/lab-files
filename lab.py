@@ -2,6 +2,7 @@ import os
 import sys
 import threading
 import re
+import html as _html
 
 # VM / rendering safety: prefer CPU raster painting in VMs to avoid partial redraws
 # Only enable these aggressive fallbacks when running on Linux VMs or when
@@ -188,6 +189,21 @@ def save_persisted_labs():
 	Python source file. A timestamped backup of the file is written first.
 	"""
 	try:
+		# Also write a local JSON backup to ensure persistence across reboots/sync
+		try:
+			labs_out = {k: [v[0], v[1]] for k, v in LABS.items()}
+			installers_out = dict(LAB_INSTALLERS)
+			difficulties_out = dict(LAB_DIFFICULTY)
+			payload = {'labs': labs_out, 'installers': installers_out, 'difficulties': difficulties_out}
+			# write local backup first (best-effort)
+			try:
+				with open(_LOCAL_LABS_CONFIG, 'w', encoding='utf-8') as _f:
+					json.dump(payload, _f, indent=2, ensure_ascii=False)
+				sys.stderr.write(f"[INFO] Wrote local labs backup to {_LOCAL_LABS_CONFIG}\n")
+			except Exception as e_local:
+				sys.stderr.write(f"[WARN] Could not write local labs backup: {e_local}\n")
+		except Exception:
+			pass
 		src = os.path.abspath(__file__)
 		# create a backup copy
 		bak = f"{src}.bak.{int(time.time())}"
@@ -969,8 +985,67 @@ class LabWindow(QMainWindow):
 	def log(self, msg: str):
 		import time
 		t = time.strftime("%H:%M:%S")
-		self.output.append(f"[{t}] {msg}")
-		self.status.setText(msg)
+		# Convert ANSI color sequences to HTML spans so QTextEdit shows colors
+		def _ansi_to_html(s: str) -> str:
+			# simple ANSI SGR to CSS color mapping
+			ansi_map = {
+				'30': '#000000', '31': '#c0392b', '32': '#27ae60', '33': '#c19a0b',
+				'34': '#0b3b6f', '35': '#7b2cbf', '36': '#16a085', '37': '#bdc3c7',
+				'90': '#7f8c8d', '91': '#ff3b3b', '92': '#2ecc71', '93': '#f1c40f',
+				'94': '#5dade2', '95': '#ff66b3', '96': '#48c9b0', '97': '#ffffff',
+			}
+			out = ''
+			open_tags = []
+			pos = 0
+			for m in re.finditer(r"\x1b\[([0-9;]+)m", s):
+				start, end = m.span()
+				if start > pos:
+					out += _html.escape(s[pos:start])
+				codes = m.group(1).split(';')
+				for code in codes:
+					if code == '0':
+						# reset
+						while open_tags:
+							out += '</span>'
+							open_tags.pop()
+						continue
+					# color codes
+					if code in ansi_map:
+						color = ansi_map[code]
+						out += f"<span style='color:{color}'>"
+						open_tags.append('span')
+					elif code == '1':
+						# bold -> use strong
+						out += "<span style='font-weight:700'>"
+						open_tags.append('span')
+				pos = end
+			# tail
+			if pos < len(s):
+				out += _html.escape(s[pos:])
+			# close any remaining tags
+			while open_tags:
+				out += '</span>'
+				open_tags.pop()
+			# preserve line breaks
+			out = out.replace('\n', '<br/>')
+			return out
+
+		try:
+			html_msg = _ansi_to_html(str(msg))
+		except Exception:
+			html_msg = _html.escape(str(msg)).replace('\n', '<br/>')
+
+		# Append as rich text so colors are visible
+		try:
+			self.output.append(f"[{t}] {html_msg}")
+		except Exception:
+			# fallback to plain text
+			self.output.append(f"[{t}] {msg}")
+		# update status bar with plain text
+		try:
+			self.status.setText(str(msg))
+		except Exception:
+			pass
 
 	def resizeEvent(self, event):
 		super().resizeEvent(event)
