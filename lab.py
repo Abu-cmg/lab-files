@@ -110,11 +110,11 @@ LABS = {'Linux – Sudo PrivEsc': ('sudo_privesc', 'Gain root via sudo misconfig
  'dsfsd': ('fsdfd', 'zxcdds'),
  'red teams': ('net', 'check'),
  'sads': ('asds', 'das (Hard)'),
- 'sdk': ('sd', 'sdsd'),
- 'zc': ('za', 'sad')}
+ 'sdk': ('sd', 'sdsd')}
+
 
 # Optional per-lab difficulty mapping (title -> 'Easy'|'Medium'|'Hard')
-LAB_DIFFICULTY = {'Linux – Sudo PrivEsc': 'Hard', 'dsfsd': 'Medium', 'sdk': 'Easy', 'zc': 'Easy'}
+LAB_DIFFICULTY = {}
 
 # Default scripts (can be overridden by env vars)
 INSTALL_SCRIPT = os.environ.get("INSTALL_SCRIPT", "/usr/local/bin/install_lab.sh")
@@ -130,11 +130,11 @@ LAB_INSTALLERS = {'asda': 'asd',
  'asds': 'asdsa',
  'fsdfd': 'sdf',
  'net': 'https://github.com/Abu-cmg/lab-files/blob/main/red.sh',
- 'sd': 'https://github.com/Abu-cmg/lab-files/blob/main/color1.sh',
- 'sudo_privesc': 'https://github.com/Abu-cmg/lab-files/blob/main/color1.sh',
+ 'sd': 'sadasd',
  'web_sqli': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/lab_web.sh.sh',
- 'web_upload': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/upload.sh',
- 'za': 'https://github.com/Abu-cmg/lab-files/blob/main/red.sh'}
+ 'web_upload': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/upload.sh'}
+
+
 
 # Persisted labs config paths: prefer system-wide '/opt/lab/labs.json'
 # but fall back to the local `labs.json` beside this script when not writable.
@@ -188,51 +188,16 @@ def save_persisted_labs():
 	"""Embed current LABS, LAB_INSTALLERS and LAB_DIFFICULTY into this
 	Python source file. A timestamped backup of the file is written first.
 	"""
-	def _find_block_bounds(s: str, name: str):
-		"""Find the start/end indices of a top-level dict assignment `name = { ... }`.
-		Returns (start_index, end_index) or (None, None) if not found.
-		"""
-		m = re.search(rf"(?m)^{name}\s*=", s)
-		if not m:
-			return (None, None)
-		# find the first '{' after the match
-		start = s.find('{', m.end())
-		if start == -1:
-			return (None, None)
-		# scan to matching closing brace
-		depth = 0
-		in_single = in_double = False
-		idx = start
-		while idx < len(s):
-			ch = s[idx]
-			# handle simple string state to avoid counting braces inside strings
-			if ch == '"' and not in_single:
-				in_double = not in_double
-			elif ch == "'" and not in_double:
-				in_single = not in_single
-			elif not in_single and not in_double:
-				if ch == '{':
-					depth += 1
-				elif ch == '}':
-					depth -= 1
-					if depth == 0:
-						# include trailing newline if present
-						end = idx + 1
-						# consume following whitespace/newlines
-						while end < len(s) and s[end] in " \t\r\n":
-							end += 1
-						return (m.start(), end)
-			idx += 1
-		return (None, None)
-
 	try:
 		src = os.path.abspath(__file__)
+		# create a backup copy
 		bak = f"{src}.bak.{int(time.time())}"
 		try:
 			shutil.copy2(src, bak)
 		except Exception:
 			bak = None
 
+		# Prepare Python literal representations
 		labs_repr = pprint.pformat({k: (v[0], v[1]) for k, v in LABS.items()}, width=120)
 		installers_repr = pprint.pformat(dict(LAB_INSTALLERS), width=120)
 		difficulties_repr = pprint.pformat(dict(LAB_DIFFICULTY), width=120)
@@ -240,30 +205,26 @@ def save_persisted_labs():
 		with open(src, 'r', encoding='utf-8') as f:
 			content = f.read()
 
-		replacements = {
-			'LABS': f"LABS = {labs_repr}\n\n",
-			'LAB_INSTALLERS': f"LAB_INSTALLERS = {installers_repr}\n\n",
-			'LAB_DIFFICULTY': f"LAB_DIFFICULTY = {difficulties_repr}\n\n",
-		}
+		# Replace LABS block
+		new_labs_block = f"LABS = {labs_repr}\n\n"
+		content, n1 = re.subn(r"(?ms)^LABS\s*=\s*\{.*?\n\}\n", new_labs_block, content)
 
-		replaced_any = False
-		for name, new_block in replacements.items():
-			start, end = _find_block_bounds(content, name)
-			if start is not None:
-				content = content[:start] + new_block + content[end:]
-				replaced_any = True
+		# Replace LAB_INSTALLERS block
+		new_inst_block = f"LAB_INSTALLERS = {installers_repr}\n\n"
+		content, n2 = re.subn(r"(?ms)^LAB_INSTALLERS\s*=\s*\{.*?\n\}\n", new_inst_block, content)
 
-		if not replaced_any:
-			# fallback: append blocks near the top (after first two newlines) to keep file valid
-			ins_pos = content.find('\n\n')
-			if ins_pos == -1:
-				ins_pos = 0
+		# Replace or insert LAB_DIFFICULTY
+		new_diff_block = f"LAB_DIFFICULTY = {difficulties_repr}\n\n"
+		if re.search(r"(?m)^LAB_DIFFICULTY\s*=", content):
+			content, n3 = re.subn(r"(?ms)^LAB_DIFFICULTY\s*=\s*\{.*?\n\}\n", new_diff_block, content)
+		else:
+			# insert after LAB_INSTALLERS block if present, else after LABS
+			if n2:
+				content = re.sub(r"(?ms)(^LAB_INSTALLERS\s*=\s*\{.*?\n\}\n)", r"\1\n" + new_diff_block, content)
 			else:
-				ins_pos += 2
-			# assemble all blocks
-			all_blocks = replacements['LABS'] + replacements['LAB_INSTALLERS'] + replacements['LAB_DIFFICULTY']
-			content = content[:ins_pos] + all_blocks + content[ins_pos:]
+				content = re.sub(r"(?ms)(^LABS\s*=\s*\{.*?\n\}\n)", r"\1\n" + new_diff_block, content)
 
+		# Write back
 		with open(src, 'w', encoding='utf-8') as f:
 			f.write(content)
 
