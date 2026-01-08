@@ -98,14 +98,19 @@ import socket
 import shlex
 import stat
 import time
+import pprint
 
 
-LABS = {
-	"Web – SQL Injection": ("web_sqli", "Practise SQLi against a vulnerable app."),
-	"Web – File Upload": ("web_upload", "Exploit insecure file upload handling."),
-	"Linux – Sudo PrivEsc": ("sudo_privesc", "Gain root via sudo misconfiguration."),
-	"Web – XSS": ("web_xss", "Learn about XSS (Cross-Site Scripting) and how to defend against it."),
-}
+LABS = {'Linux – Sudo PrivEsc': ('sudo_privesc', 'Gain root via sudo misconfiguration.'),
+ 'Web – File Upload': ('web_upload', 'Exploit insecure file upload handling.'),
+ 'Web – SQL Injection': ('web_sqli', 'Practise SQLi against a vulnerable app.'),
+ 'Web – XSS': ('web_xss', 'Learn about XSS (Cross-Site Scripting) and how to defend against it.'),
+ 'asd': ('asda', 'sdasd'),
+ 'dsfsd': ('fsdfd', 'zxcdds'),
+ 'red teams': ('net', 'check'),
+ 'sads': ('asds', 'das (Hard)'),
+ 'sdk': ('sd', 'sdsd')}
+
 
 # Optional per-lab difficulty mapping (title -> 'Easy'|'Medium'|'Hard')
 LAB_DIFFICULTY = {}
@@ -120,71 +125,14 @@ ROOT_USER = os.environ.get("ROOT_USER", "antori")
 # Per-lab installer sources. Keys are the lab codes from `LABS` values.
 # Values may be a URL to a shell installer (http/https) or None to use
 # the default `INSTALL_SCRIPT` mechanism. Add more entries here.
-LAB_INSTALLERS = {
-	'web_sqli': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/lab_web.sh.sh',
-	'web_upload': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/upload.sh',
-	# Example: 'web_upload': 'https://example.com/labs/web_upload/install.sh',
-	# 'sudo_privesc': None,  # uses INSTALL_SCRIPT with arg
-}
+LAB_INSTALLERS = {'asda': 'asd',
+ 'asds': 'asdsa',
+ 'fsdfd': 'sdf',
+ 'net': 'https://github.com/Abu-cmg/lab-files/blob/main/red.sh',
+ 'sd': 'sadasd',
+ 'web_sqli': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/lab_web.sh.sh',
+ 'web_upload': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/upload.sh'}
 
-# Installed marker paths (system then user fallback)
-_SYSTEM_MARKER = os.path.join('/opt', 'lab', 'installed_lab.json')
-_USER_MARKER_DIR = os.path.join(os.path.expanduser('~'), '.local', 'opt', 'lab')
-_USER_MARKER = os.path.join(_USER_MARKER_DIR, 'installed_lab.json')
-
-def _read_installed_marker():
-	"""Return installed marker dict or None."""
-	try:
-		if os.path.exists(_SYSTEM_MARKER):
-			with open(_SYSTEM_MARKER, 'r', encoding='utf-8') as f:
-				return json.load(f)
-		if os.path.exists(_USER_MARKER):
-			with open(_USER_MARKER, 'r', encoding='utf-8') as f:
-				return json.load(f)
-	except Exception:
-		pass
-	return None
-
-def _write_installed_marker(code: str, title: str):
-	"""Write installed marker; prefer system path, else user path."""
-	payload = {'code': code, 'title': title, 'installed_at': int(time.time())}
-	try:
-		# try system path first
-		try:
-			os.makedirs(os.path.dirname(_SYSTEM_MARKER), exist_ok=True)
-			with open(_SYSTEM_MARKER, 'w', encoding='utf-8') as f:
-				json.dump(payload, f)
-			return True
-		except Exception:
-			pass
-		# fallback to user path
-		try:
-			os.makedirs(_USER_MARKER_DIR, exist_ok=True)
-			with open(_USER_MARKER, 'w', encoding='utf-8') as f:
-				json.dump(payload, f)
-			return True
-		except Exception:
-			pass
-	except Exception:
-		pass
-	return False
-
-def _remove_installed_marker():
-	"""Remove any installed marker files."""
-	try:
-		if os.path.exists(_SYSTEM_MARKER):
-			try:
-				os.remove(_SYSTEM_MARKER)
-			except Exception:
-				pass
-		if os.path.exists(_USER_MARKER):
-			try:
-				os.remove(_USER_MARKER)
-			except Exception:
-				pass
-		return True
-	except Exception:
-		return False
 
 
 # Persisted labs config paths: prefer system-wide '/opt/lab/labs.json'
@@ -236,31 +184,52 @@ def load_persisted_labs():
 
 
 def save_persisted_labs():
-	"""Serialize current LABS and LAB_INSTALLERS.
-	Try to write system-wide config to `/opt/lab/labs.json` first. If that
-	fails (permission or other), fall back to the local `labs.json` beside the
-	script and emit a warning to stderr.
+	"""Embed current LABS, LAB_INSTALLERS and LAB_DIFFICULTY into this
+	Python source file. A timestamped backup of the file is written first.
 	"""
 	try:
-		labs_out = {k: [v[0], v[1]] for k, v in LABS.items()}
-		installers_out = dict(LAB_INSTALLERS)
-		difficulties_out = dict(LAB_DIFFICULTY)
-		payload = {'labs': labs_out, 'installers': installers_out, 'difficulties': difficulties_out}
-		# Attempt system write first
+		src = os.path.abspath(__file__)
+		# create a backup copy
+		bak = f"{src}.bak.{int(time.time())}"
 		try:
-			os.makedirs(_SYSTEM_LABS_DIR, exist_ok=True)
-			with open(_SYSTEM_LABS_CONFIG, 'w', encoding='utf-8') as f:
-				json.dump(payload, f, indent=2, ensure_ascii=False)
-			sys.stderr.write(f'[INFO] Saved labs config to {_SYSTEM_LABS_CONFIG}\n')
-			return
-		except Exception as e_sys:
-			sys.stderr.write(f'[WARN] Could not save to {_SYSTEM_LABS_CONFIG}: {e_sys}\n')
-		# Fallback to local path
-		with open(_LOCAL_LABS_CONFIG, 'w', encoding='utf-8') as f:
-			json.dump(payload, f, indent=2, ensure_ascii=False)
-		sys.stderr.write(f'[INFO] Saved labs config to {_LOCAL_LABS_CONFIG}\n')
+			shutil.copy2(src, bak)
+		except Exception:
+			bak = None
+
+		# Prepare Python literal representations
+		labs_repr = pprint.pformat({k: (v[0], v[1]) for k, v in LABS.items()}, width=120)
+		installers_repr = pprint.pformat(dict(LAB_INSTALLERS), width=120)
+		difficulties_repr = pprint.pformat(dict(LAB_DIFFICULTY), width=120)
+
+		with open(src, 'r', encoding='utf-8') as f:
+			content = f.read()
+
+		# Replace LABS block
+		new_labs_block = f"LABS = {labs_repr}\n\n"
+		content, n1 = re.subn(r"(?ms)^LABS\s*=\s*\{.*?\n\}\n", new_labs_block, content)
+
+		# Replace LAB_INSTALLERS block
+		new_inst_block = f"LAB_INSTALLERS = {installers_repr}\n\n"
+		content, n2 = re.subn(r"(?ms)^LAB_INSTALLERS\s*=\s*\{.*?\n\}\n", new_inst_block, content)
+
+		# Replace or insert LAB_DIFFICULTY
+		new_diff_block = f"LAB_DIFFICULTY = {difficulties_repr}\n\n"
+		if re.search(r"(?m)^LAB_DIFFICULTY\s*=", content):
+			content, n3 = re.subn(r"(?ms)^LAB_DIFFICULTY\s*=\s*\{.*?\n\}\n", new_diff_block, content)
+		else:
+			# insert after LAB_INSTALLERS block if present, else after LABS
+			if n2:
+				content = re.sub(r"(?ms)(^LAB_INSTALLERS\s*=\s*\{.*?\n\}\n)", r"\1\n" + new_diff_block, content)
+			else:
+				content = re.sub(r"(?ms)(^LABS\s*=\s*\{.*?\n\}\n)", r"\1\n" + new_diff_block, content)
+
+		# Write back
+		with open(src, 'w', encoding='utf-8') as f:
+			f.write(content)
+
+		sys.stderr.write(f"[INFO] Embedded labs into source: {src} (backup: {bak})\n")
 	except Exception as e:
-		sys.stderr.write(f'[WARN] Failed to save labs config: {e}\n')
+		sys.stderr.write(f"[WARN] Failed to embed labs into source: {e}\n")
 
 # Attempt to load persisted labs at startup
 load_persisted_labs()
@@ -820,13 +789,6 @@ class LabWindow(QMainWindow):
 				except Exception:
 					pass
 				ctrl_layout.addWidget(self._target_ip_card)
-				# Show target IP only if a lab is currently installed
-				try:
-					marker = _read_installed_marker()
-					if not marker:
-						self._target_ip_card.setVisible(False)
-				except Exception:
-					pass
 				try:
 					ctrl_layout.setAlignment(self._target_ip_card, Qt.AlignmentFlag.AlignTop)
 					self._target_ip_card.raise_()
@@ -1098,26 +1060,6 @@ class LabWindow(QMainWindow):
 			except Exception:
 				pass
 
-	def _refresh_target_ip_visibility(self):
-		"""Show/hide the target IP UI based on whether a lab is installed."""
-		try:
-			marker = _read_installed_marker()
-			visible = bool(marker)
-			# update card visibility
-			try:
-				self._target_ip_card.setVisible(visible)
-			except Exception:
-				pass
-			# update label text from env if visible
-			try:
-				if visible:
-					ip = os.environ.get('TARGET_IP') or '...'
-					self._target_ip_text.setText(f"IP: {ip}")
-			except Exception:
-				pass
-		except Exception:
-			pass
-
 	def _on_card_click(self, code, frame: 'CardWidget'):
 		# clear previous selections
 		for c in self.cards:
@@ -1174,44 +1116,6 @@ class LabWindow(QMainWindow):
 					proc.wait()
 					rc = proc.returncode
 					self.output_signal.emit(f"[+] Finished (exit code {rc})")
-					# If this was an installer run (arg set to lab code) and it succeeded, record installed marker
-					try:
-						if rc == 0 and arg:
-							# handle reset runs (arg like 'reset:<code>') vs installer runs
-							try:
-								if isinstance(arg, str) and arg.startswith('reset:'):
-									rcode = arg.split(':', 1)[1] if ':' in arg else arg
-									_removed = _remove_installed_marker()
-									if _removed:
-										self.output_signal.emit(f"[+] Removed installed marker for: {rcode}")
-										try:
-											QTimer.singleShot(0, self._refresh_target_ip_visibility)
-										except Exception:
-											pass
-								else:
-									# installer run (arg is lab code) -> write marker
-									code = arg
-									# attempt to resolve title from LABS mapping
-									title = None
-									for t, v in LABS.items():
-										try:
-											if v and v[0] == code:
-												title = t
-										except Exception:
-											pass
-									if not title:
-										title = code
-									_written = _write_installed_marker(code, title)
-									if _written:
-										self.output_signal.emit(f"[+] Recorded installed lab: {title} ({code})")
-										try:
-											QTimer.singleShot(0, self._refresh_target_ip_visibility)
-										except Exception:
-											pass
-							except Exception:
-								pass
-					except Exception:
-						pass
 				except FileNotFoundError:
 					self.output_signal.emit(f"[ERROR] Script not found: {script_path}")
 				except Exception as e:
@@ -1293,9 +1197,9 @@ class LabWindow(QMainWindow):
 			except Exception as e:
 				self.output_signal.emit(f"[WARN] chmod failed: {e}")
 
-			# run in background and stream; pass the lab_code as arg so completion can record installed marker
+			# run in background and stream
 			self.output_signal.emit(f"[+] Executing downloaded script in background: {dest}")
-			self._run_script_thread(dest, lab_code or "")
+			self._run_script_thread(dest, "")
 		except Exception as e:
 			self.output_signal.emit(f"[ERROR] Failed to download/execute {url}: {e}")
 			self.set_busy(False)
@@ -1307,24 +1211,6 @@ class LabWindow(QMainWindow):
 			return
 		lab = self.selected_lab
 		self.log(f"[+] Installing lab: {lab}")
-		# If another lab is already installed, require reset first
-		try:
-			marker = _read_installed_marker()
-			if marker and marker.get('code') and marker.get('code') != lab:
-				msg = (
-					f"An installed lab was detected: {marker.get('title')} ({marker.get('code')}).\n\n"
-					"To install a different lab, please run Reset / Cleanup first.\n\n"
-					"Click 'Reset Now' to run cleanup, or 'Cancel' to abort the install."
-				)
-				res = QMessageBox.question(self, 'Existing lab found', msg, QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-				if res == QMessageBox.StandardButton.Yes:
-					# run reset and abort install; user can retry after reset
-					self.reset_lab()
-					return
-				else:
-					return
-		except Exception:
-			pass
 		# Per-lab installers: if a URL is configured for this lab, download and run it
 		installer = LAB_INSTALLERS.get(lab)
 		if installer:
@@ -1638,47 +1524,11 @@ class LabWindow(QMainWindow):
 
 	def reset_lab(self):
 		self.log("[+] Resetting lab environment")
-		# Determine if a lab is currently installed and perform per-lab reset when possible
-		marker = _read_installed_marker()
-		if marker and isinstance(marker, dict):
-			code = marker.get('code')
-			title = marker.get('title') or code
-			# try common per-lab reset script names under /opt/lab
-			candidates = [
-				os.path.join('/opt', 'lab', f'reset_{code}.sh'),
-				os.path.join('/opt', 'lab', f'uninstall_{code}.sh'),
-				os.path.join('/opt', 'lab', 'reset.sh'),
-			]
-			for p in candidates:
-				try:
-					if os.path.exists(p):
-						# ensure executable
-						try:
-							if os.name != 'nt':
-								st = os.stat(p)
-								os.chmod(p, st.st_mode | stat.S_IEXEC)
-						except Exception:
-							pass
-						# run reset and pass special arg so we can remove marker on success
-						threading.Thread(target=self._run_script_thread, args=(p, f'reset:{code}'), daemon=True).start()
-						return
-				except Exception:
-					continue
-			# no per-lab script found: try configured RESET_SCRIPT with reset arg (non-interactive)
-			try:
-				threading.Thread(target=self._run_script_thread, args=(RESET_SCRIPT, f'reset:{code}'), daemon=True).start()
-				return
-			except Exception:
-				pass
-			# as a last resort, try to run RESET_SCRIPT with elevation (may be interactive)
-			try:
-				self._run_as_admin(RESET_SCRIPT, f'reset:{code}')
-			except Exception:
-				self.log('[ERROR] Could not run reset script; please reset manually as root')
-			return
-		# No installed marker: fallback to global reset behaviour
+		# Prefer a packaged reset script under /opt/lab/reset.sh run non-interactively
 		opt_reset = '/opt/lab/reset.sh'
+		# If packaged reset exists, run it in background and stream output to UI
 		if os.path.exists(opt_reset):
+			# ensure executable bit on unix
 			try:
 				if os.name != 'nt':
 					st = os.stat(opt_reset)
@@ -1691,47 +1541,8 @@ class LabWindow(QMainWindow):
 		try:
 			self._run_as_admin(RESET_SCRIPT, "")
 		except Exception:
+			# fallback to background thread
 			threading.Thread(target=self._run_script_thread, args=(RESET_SCRIPT, ""), daemon=True).start()
-
-	def open_shell(self):
-		"""Try to launch a terminal emulator for interactive debugging.
-		Falls back to a user-visible message if no terminal found.
-		"""
-		# common terminal emulator launch commands (command, args...)
-		candidates = [
-			['gnome-terminal','--','/bin/bash','-i'],
-			['lxterminal','-e','/bin/bash'],
-			['x-terminal-emulator','-e','/bin/bash'],
-			['xterm','-e','/bin/bash'],
-			['konsole','-e','/bin/bash'],
-			['urxvt','-e','/bin/bash'],
-		]
-		# Windows fallbacks (Windows Terminal, PowerShell, cmd)
-		win_candidates = [
-			['wt','-w','0','new-tab','pwsh'],
-			['powershell.exe'],
-			['cmd.exe'],
-		]
-		for cmd in candidates:
-			try:
-				if shutil.which(cmd[0]):
-					subprocess.Popen(cmd, start_new_session=True)
-					self.log(f"[+] Launched terminal: {cmd[0]}")
-					return
-			except Exception as e:
-				self.log(f"[ERROR] Failed to launch {cmd[0]}: {e}")
-		# Try Windows candidates if on Windows
-		if sys.platform.startswith('win'):
-			for cmd in win_candidates:
-				try:
-					if shutil.which(cmd[0]):
-						subprocess.Popen(cmd, shell=False)
-						self.log(f"[+] Launched terminal: {cmd[0]}")
-						return
-				except Exception as e:
-					self.log(f"[ERROR] Failed to launch {cmd[0]}: {e}")
-		# no terminal emulator found
-		QMessageBox.information(self, 'No terminal', 'No terminal emulator found on system. Please install xterm or run a shell via SSH for debugging.')
 
 	def cancel_current(self):
 		if not getattr(self, 'current_proc', None):
@@ -1744,6 +1555,21 @@ class LabWindow(QMainWindow):
 			threading.Timer(3.0, lambda: proc.kill() if proc.poll() is None else None).start()
 		except Exception as e:
 			self.log(f"[ERROR] Failed to terminate: {e}")
+
+	def open_shell(self):
+		"""Try to launch a terminal emulator for interactive debugging.
+		Falls back to a user-visible message if no terminal found.
+		"""
+		# common terminal emulator launch commands (command, args...)
+		# Try common terminal emulators, prefer launching /bin/bash directly.
+		candidates = [
+			['gnome-terminal','--','/bin/bash','-i'],
+			['lxterminal','-e','/bin/bash'],
+			['x-terminal-emulator','-e','/bin/bash'],
+			['xterm','-e','/bin/bash'],
+			['konsole','-e','/bin/bash'],
+			['urxvt','-e','/bin/bash'],
+		]
 		# Windows fallbacks (Windows Terminal, PowerShell, cmd)
 		win_candidates = [
 			['wt','-w','0','new-tab','pwsh'],
