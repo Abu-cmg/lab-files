@@ -308,10 +308,11 @@ ADMIN_GID=$(id -g admin)
 
 cat <<EOF > /tmp/suid_admin.c
 #include <unistd.h>
+
 int main() {
-    setuid($ADMIN_UID);
     setgid($ADMIN_GID);
-    execl("/bin/bash", "bash", NULL);
+    setuid($ADMIN_UID);
+    execl("/bin/bash", "bash", "-p", NULL);
     return 0;
 }
 EOF
@@ -320,6 +321,7 @@ gcc /tmp/suid_admin.c -o /usr/local/bin/adminshell
 chown admin:admin /usr/local/bin/adminshell
 chmod 4755 /usr/local/bin/adminshell
 rm /tmp/suid_admin.c
+
 
 # ---------------------------
 # ADMIN ENCRYPTED NOTE
