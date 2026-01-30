@@ -3,7 +3,7 @@
 set -e
 
 echo "[+] Updating system"
-apt update -y
+
 
 echo "[+] Installing required packages"
 apt install -y apache2 php php-cli openssl sudo gcc unzip
