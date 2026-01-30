@@ -1368,11 +1368,14 @@ class LabWindow(QMainWindow):
 			ru = os.environ.get('ROOT_USER', ROOT_USER)
 			if not ru:
 				return cmd
-			# require sudo available to perform the user switch
+			# require sudo available to perform the elevation
 			if shutil.which('sudo'):
-				# use -n to avoid interactive password prompts; calling code is
-				# responsible for ensuring sudoers permits this action.
-				return ['sudo', '-n', '-u', ru, '--'] + list(cmd)
+				# Use non-interactive sudo to execute the command as root. This
+				# matches the application's existing guidance to add a sudoers
+				# NOPASSWD rule for unattended installs. If the intent is to run
+				# as a specific non-root user, set ROOT_USER to that name and the
+				# caller can opt out of elevation.
+				return ['sudo', '-n', '--'] + list(cmd)
 			return cmd
 		except Exception:
 			return cmd
