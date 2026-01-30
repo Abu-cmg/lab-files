@@ -1,5 +1,10 @@
 #!/bin/bash
 set -e
+echo "[+] Unmasking required services..."
+
+systemctl unmask apache2 2>/dev/null || true
+systemctl enable apache2
+systemctl start apache2
 
 echo "[+] Updating system"
 
