@@ -95,7 +95,6 @@ nav a {
   margin-left: 20px;
   text-decoration: none;
   font-weight: 600;
-  transition: opacity 0.3s;
 }
 
 nav a:hover {
@@ -104,7 +103,6 @@ nav a:hover {
 
 /* Hero */
 .hero {
-  background: url("assets/banner.jpg") center/cover no-repeat;
   padding: 80px 20px;
   text-align: center;
 }
@@ -114,28 +112,19 @@ nav a:hover {
   margin-bottom: 10px;
 }
 
-.hero p {
-  opacity: 0.9;
-}
-
-/* Main container */
+/* Layout */
 .container {
   width: 90%;
   max-width: 1200px;
   margin: 40px auto;
 }
 
-/* Cards */
 .card {
-  background: rgba(255, 255, 255, 0.12);
+  background: rgba(255,255,255,0.12);
   backdrop-filter: blur(8px);
   padding: 30px;
   border-radius: 12px;
   box-shadow: 0 15px 35px rgba(0,0,0,0.35);
-}
-
-.card h2 {
-  margin-bottom: 10px;
 }
 
 .grid {
@@ -145,27 +134,20 @@ nav a:hover {
   margin-top: 30px;
 }
 
-.grid .card {
-  text-align: center;
-}
-
-/* Footer */
 footer {
   margin-top: 60px;
   padding: 20px;
   text-align: center;
   background: rgba(0,0,0,0.6);
-  font-size: 0.9rem;
   opacity: 0.8;
 }
-
 EOF
 
 # ---- index.php (LFI include) ----
 cat <<EOF > $WEBROOT/index.php
 <?php
-if (isset($_GET['page'])) {
-    include($_GET['page']);
+if (isset(\$_GET['page'])) {
+    include(\$_GET['page']);
     exit;
 }
 ?>
@@ -223,43 +205,40 @@ if (isset($_GET['page'])) {
 <footer>© 2026 CorpShop · Internal Use Only</footer>
 </body>
 </html>
-
 EOF
 
-# ---- other pages ----
+# ---- Pages ----
 cat <<EOF > $WEBROOT/home.php
 <h2>Home</h2>
 <p>Welcome employee. Please browse responsibly.</p>
 EOF
 
-cat <<EOF > $WEBROOT/service.php
+cat <<EOF > $WEBROOT/services.php
 <h2>Internal Services</h2>
-<p>The following internal services are available to CorpShop employees:</p>
-
 <ul>
   <li>Procurement System</li>
   <li>Asset Management</li>
   <li>Internal Ticketing</li>
   <li>Finance Dashboard</li>
 </ul>
-
 <p><i>Access restricted based on department.</i></p>
+EOF
 
+cat <<EOF > $WEBROOT/employees.php
+<h2>Employees</h2>
+<table border="0" cellpadding="10">
+<tr><td><b>Name</b></td><td><b>Department</b></td></tr>
+<tr><td>Alice Morgan</td><td>Finance</td></tr>
+<tr><td>John Carter</td><td>IT Support</td></tr>
+<tr><td>Sarah Lee</td><td>Procurement</td></tr>
+</table>
 EOF
 
 cat <<EOF > $WEBROOT/admin.php
 <h2>Administration Panel</h2>
-<p><b>Warning:</b> This section is restricted.</p>
-
-<p>
-Administrative actions require elevated privileges.
-Unauthorized access attempts are logged.
-</p>
-
-<p style="color:#ffcccc;">
-Access denied.
-</p>
-
+<p><b>Warning:</b> Restricted area.</p>
+<p>Unauthorized access attempts are logged.</p>
+<p style="color:#ffcccc;">Access denied.</p>
 EOF
 
 cat <<EOF > $WEBROOT/about.php
@@ -272,6 +251,16 @@ cat <<EOF > $WEBROOT/contact.php
 <p>IT Support: it-support@corp.local</p>
 EOF
 
+cat <<EOF > $WEBROOT/docs.php
+<h2>System Status</h2>
+<ul>
+  <li>Web Portal: Online</li>
+  <li>Database: Online</li>
+  <li>Internal File Server: Online</li>
+</ul>
+<p>Last updated: <?php echo date("Y-m-d H:i"); ?></p>
+EOF
+
 # ---- view.php (file read vuln) ----
 cat <<EOF > $WEBROOT/view.php
 <?php
@@ -281,19 +270,6 @@ if (isset(\$_GET['file'])) {
 ?>
 EOF
 
-cat <<EOF > $WEBROOT/docs.php
-<h2>System Status</h2>
-<p>All systems are currently operational.</p>
-
-<ul>
-  <li>Web Portal: Online</li>
-  <li>Database: Online</li>
-  <li>Internal File Server: Online</li>
-</ul>
-
-<p>Last updated: <?php echo date("Y-m-d H:i"); ?></p>
-
-EOF
 # ---- config.php (FLAG1) ----
 cat <<EOF > $WEBROOT/config.php
 <?php
@@ -301,36 +277,10 @@ cat <<EOF > $WEBROOT/config.php
 // SSH access
 // user: raj
 // password: raj@123
-// FLAG: $FLAG1
+// FLAG: FLAG{corp_shop_lfi_success}
 ?>
 EOF
 
-cat <<EOF > $WEBROOT/admin.php
-<h2>Employees</h2>
-<p>Active internal employee directory:</p>
-
-<table border="0" cellpadding="10">
-  <tr>
-    <td><b>Name</b></td>
-    <td><b>Department</b></td>
-  </tr>
-  <tr>
-    <td>Alice Morgan</td>
-    <td>Finance</td>
-  </tr>
-  <tr>
-    <td>John Carter</td>
-    <td>IT Support</td>
-  </tr>
-  <tr>
-    <td>Sarah Lee</td>
-    <td>Procurement</td>
-  </tr>
-</table>
-
-<p style="margin-top:15px;"><i>Full directory available internally only.</i></p>
-
-EOF
 # ---------------------------
 # /etc/passwd HINT
 # ---------------------------
