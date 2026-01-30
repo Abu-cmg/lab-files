@@ -1220,12 +1220,11 @@ class LabWindow(QMainWindow):
 		"""Download the web_sqli install script and execute it."""
 		# Delegate to generic downloader+executor for web scripts
 		try:
-			# Request elevation when executing web installers so they run as root if possible
-			self._download_and_execute_url('https://raw.githubusercontent.com/Abu-cmg/lab-files/main/lab_web.sh.sh', 'web_sqli', True)
+			self._download_and_execute_url('https://raw.githubusercontent.com/Abu-cmg/lab-files/main/lab_web.sh.sh', 'web_sqli')
 		except Exception as e:
 			self.output_signal.emit(f"[ERROR] Failed to start web installer: {e}")
 
-	def _download_and_execute_url(self, url: str, lab_code: str = None, run_as_admin: bool = False):
+	def _download_and_execute_url(self, url: str, lab_code: str = None):
 		"""Generic downloader + executor for lab installer URLs.
 		Downloads `url` to a temp file and runs it in a background thread,
 		streaming output to the UI using `_run_script_thread`.
@@ -1287,18 +1286,9 @@ class LabWindow(QMainWindow):
 			except Exception as e:
 				self.output_signal.emit(f"[WARN] chmod failed: {e}")
 
-			# run in background and stream. By default run as current user; callers
-			# may request elevation by passing `run_as_admin=True`.
+			# run in background and stream
 			self.output_signal.emit(f"[+] Executing downloaded script in background: {dest}")
-			try:
-				if run_as_admin:
-					# attempt elevation-aware launch
-					self._run_as_admin(dest, "")
-				else:
-					self._run_script_thread(dest, "")
-			except NameError:
-				# fallback if _run_as_admin is not present for some reason
-				self._run_script_thread(dest, "")
+			self._run_script_thread(dest, "")
 		except Exception as e:
 			self.output_signal.emit(f"[ERROR] Failed to download/execute {url}: {e}")
 			self.set_busy(False)
@@ -1373,8 +1363,7 @@ class LabWindow(QMainWindow):
 		if installer:
 			# If installer looks like a URL, download and execute in background
 			if installer.startswith('http://') or installer.startswith('https://'):
-				# Downloaded URL installers often require root; request elevation when executing.
-				threading.Thread(target=self._download_and_execute_url, args=(installer, lab, True), daemon=True).start()
+				threading.Thread(target=self._download_and_execute_url, args=(installer, lab), daemon=True).start()
 				# mark as installed and disable further installs until reset
 				try:
 					self._set_installed_lab(lab)
