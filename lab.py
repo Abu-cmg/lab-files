@@ -1198,6 +1198,11 @@ class LabWindow(QMainWindow):
 				if arg:
 					cmd.append(arg)
 				try:
+					# Attempt to run the command under configured ROOT_USER if possible
+					try:
+						cmd = self._wrap_with_root_user(cmd)
+					except Exception:
+						pass
 					proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
 					self.current_proc = proc
 					for line in proc.stdout:
@@ -1347,6 +1352,30 @@ class LabWindow(QMainWindow):
 					pass
 		except Exception:
 			pass
+
+
+	def _wrap_with_root_user(self, cmd: list) -> list:
+		"""If possible, wrap `cmd` so it runs as `ROOT_USER` using sudo.
+		This returns the wrapped command list or the original on failure.
+		Note: uses `sudo -n -u ROOT_USER` (non-interactive). Caller must ensure
+		the configured `ROOT_USER` sudoers entry exists if elevation is required.
+		"""
+		try:
+			# No-op on Windows
+			if os.name == 'nt':
+				return cmd
+			# prefer explicit env override but fall back to module-level default
+			ru = os.environ.get('ROOT_USER', ROOT_USER)
+			if not ru:
+				return cmd
+			# require sudo available to perform the user switch
+			if shutil.which('sudo'):
+				# use -n to avoid interactive password prompts; calling code is
+				# responsible for ensuring sudoers permits this action.
+				return ['sudo', '-n', '-u', ru, '--'] + list(cmd)
+			return cmd
+		except Exception:
+			return cmd
 
 	def install_lab(self):
 		# Prevent installing a new lab if one is already installed
@@ -1585,8 +1614,16 @@ class LabWindow(QMainWindow):
 				pass
 			if is_root:
 				try:
-					subprocess.Popen([script_path] + ([arg] if arg else []), start_new_session=True)
-					self.log(f"[+] Running as root, launched script directly: {script_path}")
+					# Even when running as root, prefer to execute under the configured
+					# `ROOT_USER` where appropriate (wrap via sudo -u). Fall back to
+					# direct execution if wrapping fails.
+					cmdlist = [script_path] + ([arg] if arg else [])
+					try:
+						cmdlist = self._wrap_with_root_user(cmdlist)
+					except Exception:
+						pass
+					subprocess.Popen(cmdlist, start_new_session=True)
+					self.log(f"[+] Running as root, launched script: {script_path}")
 					return
 				except Exception as e:
 					self.log(f"[WARN] direct run as root failed: {e}")
