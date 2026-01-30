@@ -271,7 +271,7 @@ if (isset(\$_GET['file'])) {
 EOF
 
 # ---- config.php (FLAG1) ----
-cat <<EOF > $WEBROOT/config.php
+cat <<EOF > $WEBROOT/breakinglink.php
 <?php
 // Internal testing credentials
 // SSH access
