@@ -9,6 +9,7 @@ echo "[+] Installing required packages"
 apt install -y apache2 php php-cli openssl sudo gcc unzip
 
 echo "[+] Enabling Apache"
+systemctl unmask apache2
 systemctl enable apache2
 systemctl start apache2
 
