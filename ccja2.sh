@@ -44,26 +44,106 @@ FLAG3="ee12cd98ab001ff923abcde7741ffed2"
 FLAG4="9f00deadbeefaa001122334455667788"
 
 # ---------------------------
-# WEB APP (VULNERABLE)
+# WEB APP (VULNERABLE + PRETTY)
 # ---------------------------
 
 echo "[+] Setting up vulnerable web app"
 
-mkdir -p /var/www/html/shop
+WEBROOT="/var/www/html/shop"
+mkdir -p "$WEBROOT/assets"
 chown -R www-data:www-data /var/www/html
 chmod -R 755 /var/www/html
 
-cat <<EOF > /var/www/html/shop/index.php
+# ---- CSS ----
+cat <<EOF > $WEBROOT/assets/style.css
+body {
+  background: linear-gradient(135deg, #0f2027, #203a43, #2c5364);
+  font-family: Arial, sans-serif;
+  color: #fff;
+  margin: 0;
+}
+header {
+  background: rgba(0,0,0,0.6);
+  padding: 20px;
+  text-align: center;
+}
+nav a {
+  color: #00e6e6;
+  margin: 0 15px;
+  text-decoration: none;
+  font-weight: bold;
+}
+.container {
+  padding: 40px;
+}
+.card {
+  background: rgba(255,255,255,0.1);
+  padding: 25px;
+  border-radius: 10px;
+  width: 60%;
+}
+footer {
+  text-align: center;
+  padding: 20px;
+  opacity: 0.6;
+}
+EOF
+
+# ---- index.php (LFI include) ----
+cat <<EOF > $WEBROOT/index.php
 <?php
 if (isset(\$_GET['page'])) {
     include(\$_GET['page']);
-} else {
-    echo "<h1>Welcome to CorpShop</h1>";
+    exit;
 }
 ?>
+<!DOCTYPE html>
+<html>
+<head>
+  <title>CorpShop</title>
+  <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+<header>
+  <h1>CorpShop Internal Portal</h1>
+  <nav>
+    <a href="?page=home.php">Home</a>
+    <a href="?page=about.php">About</a>
+    <a href="?page=contact.php">Contact</a>
+  </nav>
+</header>
+
+<div class="container">
+  <div class="card">
+    <h2>Welcome</h2>
+    <p>Internal company shopping and admin portal.</p>
+    <p><b>Employees only.</b></p>
+  </div>
+</div>
+
+<footer>© 2026 CorpShop</footer>
+</body>
+</html>
 EOF
 
-cat <<EOF > /var/www/html/shop/view.php
+# ---- other pages ----
+cat <<EOF > $WEBROOT/home.php
+<h2>Home</h2>
+<p>Welcome employee. Please browse responsibly.</p>
+EOF
+
+cat <<EOF > $WEBROOT/about.php
+<h2>About</h2>
+<p>CorpShop is an internal-only corporate service.</p>
+EOF
+
+cat <<EOF > $WEBROOT/contact.php
+<h2>Contact</h2>
+<p>IT Support: it-support@corp.local</p>
+EOF
+
+# ---- view.php (file read vuln) ----
+cat <<EOF > $WEBROOT/view.php
 <?php
 if (isset(\$_GET['file'])) {
     echo file_get_contents(\$_GET['file']);
@@ -71,7 +151,8 @@ if (isset(\$_GET['file'])) {
 ?>
 EOF
 
-cat <<EOF > /var/www/html/shop/config.php
+# ---- config.php (FLAG1) ----
+cat <<EOF > $WEBROOT/config.php
 <?php
 // Internal testing credentials
 // SSH access
@@ -128,11 +209,13 @@ rm /tmp/suid_admin.c
 echo "[+] Creating encrypted admin message"
 
 ADMIN_DIR="/home/admin"
-KEY_FILE="\$ADMIN_DIR/key.key"
-NOTE_FILE="\$ADMIN_DIR/note.txt"
-ENC_FILE="\$ADMIN_DIR/root.enc"
+mkdir -p "$ADMIN_DIR"
 
-openssl rand -hex 16 > "\$KEY_FILE"
+KEY_FILE="$ADMIN_DIR/key.key"
+NOTE_FILE="$ADMIN_DIR/note.txt"
+ENC_FILE="$ADMIN_DIR/root.enc"
+
+openssl rand -hex 16 > "$KEY_FILE"
 
 cat <<EOF > /tmp/root_note.txt
 hey admin the root user on server
@@ -144,18 +227,18 @@ EOF
 
 openssl enc -aes-256-cbc -pbkdf2 -salt \
   -in /tmp/root_note.txt \
-  -out "\$ENC_FILE" \
-  -pass file:"\$KEY_FILE"
+  -out "$ENC_FILE" \
+  -pass file:"$KEY_FILE"
 
 rm /tmp/root_note.txt
 
-echo "Encrypted note: root.enc" > "\$NOTE_FILE"
-echo "Key location: key.key" >> "\$NOTE_FILE"
-echo "FLAG: $FLAG3" >> "\$NOTE_FILE"
+echo "Encrypted note: root.enc" > "$NOTE_FILE"
+echo "Key location: key.key" >> "$NOTE_FILE"
+echo "FLAG: $FLAG3" >> "$NOTE_FILE"
 
 chown -R admin:admin /home/admin
 chmod 700 /home/admin
-chmod 600 /home/admin/*
+find /home/admin -type f -exec chmod 600 {} \;
 
 # ---------------------------
 # ROOT PASSWORD DROP
@@ -164,19 +247,16 @@ chmod 600 /home/admin/*
 echo "[+] Creating root password file"
 
 ROOTPASS="Root@987"
-echo "\$ROOTPASS" > /tmp/ps.txt
+echo "$ROOTPASS" > /tmp/ps.txt
 chmod 600 /tmp/ps.txt
-echo "root:\$ROOTPASS" | chpasswd
+echo "root:$ROOTPASS" | chpasswd
 
 echo "$FLAG4" > /root/root.txt
 chmod 600 /root/root.txt
 
 # ---------------------------
-# CLEANUP
+# FINISH
 # ---------------------------
-
-echo "[+] Cleaning history"
-history -c || true
 
 echo
 echo "======================================"
