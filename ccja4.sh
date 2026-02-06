@@ -370,10 +370,13 @@ echo "[+] Creating root password file"
 
 ROOTPASS="Root@987"
 
-# create file as root FIRST
+# IMPORTANT: remove old file first to avoid permission denied
+rm -f /tmp/ps.txt
+
+# create file
 echo "$ROOTPASS" > /tmp/ps.txt
 
-# now lock it to admin only
+# lock ownership to admin
 chown admin:admin /tmp/ps.txt
 chmod 600 /tmp/ps.txt
 
@@ -383,6 +386,7 @@ echo "root:$ROOTPASS" | chpasswd
 # create root flag
 echo "$FLAG4" > /root/root.txt
 chmod 600 /root/root.txt
+
 
 
 # ---------------------------
