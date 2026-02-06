@@ -371,10 +371,9 @@ echo "[+] Creating root password file"
 
 ROOTPASS="Root@987"
 echo "$ROOTPASS" > /tmp/ps.txt
+chown  admin:admin /tmp/ps.txt
 chmod 600 /tmp/ps.txt
 echo "root:$ROOTPASS" | chpasswd
-chmod 600 /tmp/ps.txt
-chown  admin:admin /tmp/ps.txt
 echo "$FLAG4" > /root/root.txt
 chmod 600 /root/root.txt
 
