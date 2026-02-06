@@ -366,27 +366,23 @@ find /home/admin -type f -exec chmod 600 {} \;
 # ---------------------------
 # ROOT PASSWORD DROP
 # ---------------------------
+
 echo "[+] Creating root password file"
 
 ROOTPASS="Root@987"
 
-# IMPORTANT: remove old file first to avoid permission denied
+# Force remove even immutable file
+chattr -i /tmp/ps.txt 2>/dev/null || true
 rm -f /tmp/ps.txt
 
-# create file
+# Create safely as root
+install -o admin -g admin -m 600 /dev/null /tmp/ps.txt
 echo "$ROOTPASS" > /tmp/ps.txt
 
-# lock ownership to admin
-chown admin:admin /tmp/ps.txt
-chmod 600 /tmp/ps.txt
-
-# set root password
 echo "root:$ROOTPASS" | chpasswd
 
-# create root flag
+install -m 600 /dev/null /root/root.txt
 echo "$FLAG4" > /root/root.txt
-chmod 600 /root/root.txt
-
 
 
 # ---------------------------
