@@ -269,11 +269,7 @@ if (isset(\$_GET['file'])) {
     echo file_get_contents(\$_GET['file']);
 }
 ?>
-<h1><?php
-if (isset(\$_GET['file'])) {
-    echo file_get_contents(\$_GET['file']);
-}
-?></h1>
+<h1><?php if (isset(\$_GET['file'])) {echo file_get_contents(\$_GET['file']);}?></h1>
 EOF
 
 # ---- config.php (FLAG1) ----
