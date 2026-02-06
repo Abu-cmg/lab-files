@@ -370,9 +370,6 @@ echo "[+] Creating root password file"
 
 ROOTPASS="Root@987"
 
-# remove old file if it exists (prevents permission issues)
-rm -f /tmp/ps.txt
-
 # create file as root FIRST
 echo "$ROOTPASS" > /tmp/ps.txt
 
