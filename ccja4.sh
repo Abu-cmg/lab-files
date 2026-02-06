@@ -170,6 +170,7 @@ if (isset(\$_GET['page'])) {
       <a href="?page=employees.php">Employees</a>
       <a href="?page=docs.php">Docs</a>
       <a href="?page=admin.php">Admin</a>
+      <a href="view.php?file=index.php">View</a>
     </nav>
   </div>
 </header>
@@ -268,6 +269,11 @@ if (isset(\$_GET['file'])) {
     echo file_get_contents(\$_GET['file']);
 }
 ?>
+<h1><?php
+if (isset(\$_GET['file'])) {
+    echo file_get_contents(\$_GET['file']);
+}
+?></h1>
 EOF
 
 # ---- config.php (FLAG1) ----
