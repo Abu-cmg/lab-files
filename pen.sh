@@ -56,6 +56,7 @@ listen_ipv6=NO
 anonymous_enable=YES
 local_enable=YES
 write_enable=YES
+allow_writeable_chroot=YES
 
 anon_root=/srv/ftp
 
