@@ -3,284 +3,237 @@
 echo "[+] Updating system..."
 apt update -y
 
-echo "[+] Installing packages..."
-apt install -y apache2 php libapache2-mod-php build-essential wget samba hydra wordlists unzip
+echo "[+] Installing Apache, PHP..."
+apt install apache2 php libapache2-mod-php -y
 
-gunzip -f /usr/share/wordlists/rockyou.txt.gz 2>/dev/null
+echo "[+] Enabling Apache..."
+systemctl unmask apache2
+systemctl enable apache2
+systemctl start apache2
 
-#################################################
-# VULNERABLE VSFTPD 2.3.4
-#################################################
-
-cd /tmp
-wget https://security.appspot.com/downloads/vsftpd-2.3.4.tar.gz
-tar -xzf vsftpd-2.3.4.tar.gz
-cd vsftpd-2.3.4
-make
-cp vsftpd /usr/local/sbin/vsftpd
-
-mkdir -p /etc/vsftpd
-cat <<EOF > /etc/vsftpd.conf
-listen=YES
-anonymous_enable=NO
-local_enable=YES
-write_enable=YES
-local_umask=022
-background=NO
-EOF
-
-useradd -m ftpuser
-echo "ftpuser:ftp123" | chpasswd
-echo "nothing here" > /home/ftpuser/imp.txt
-chmod 777 /home/ftpuser/imp.txt
-
-/usr/local/sbin/vsftpd /etc/vsftpd.conf &
-
-#################################################
-# SMB SHARE
-#################################################
-
-mkdir -p /srv/smbshare
-chmod 777 /srv/smbshare
-echo "FLAG{SMB_PWNED}" > /srv/smbshare/flag.txt
-
-cat <<EOF >> /etc/samba/smb.conf
-
-[share]
-   path = /srv/smbshare
-   browsable = yes
-   writable = yes
-   guest ok = yes
-   read only = no
-EOF
-
-systemctl restart smbd
-
-#################################################
-# WEAK SSH USER
-#################################################
-
-useradd -m weakuser
-echo "weakuser:password123" | chpasswd
-
-#################################################
-# WEB APP WITH PROFESSIONAL DESIGN
-#################################################
-
+echo "[+] Creating Web Directory..."
 mkdir -p /var/www/html/assets
 mkdir -p /var/www/html/pages
+mkdir -p /var/www/html/hidden
+mkdir -p /var/www/html/uploads
 
-################ CSS ################
+echo "[+] Creating Flag..."
+echo "FLAG{LFI_MASTER_ACCESS_GRANTED}" > /root/flag.txt
+chmod 644 /root/flag.txt
 
-cat <<EOF > /var/www/html/assets/style.css
-*{margin:0;padding:0;box-sizing:border-box}
+############################################
+# INDEX PAGE
+############################################
 
-body{
-background:linear-gradient(135deg,#0f172a,#1e293b);
-color:#e2e8f0;
-font-family:'Segoe UI',sans-serif;
-}
+cat > /var/www/html/index.php <<'EOF'
+<?php include("header.php"); ?>
 
-header{
-background:rgba(30,41,59,0.9);
-padding:25px;
-text-align:center;
-backdrop-filter:blur(8px);
-border-bottom:1px solid #334155;
-}
+<div class="card">
+<h2>Welcome to Pentest Corporate Portal</h2>
+<p>This internal portal provides access to training materials and company documentation.</p>
+<p>Explore resources carefully.</p>
+</div>
 
-header h1{
-color:#38bdf8;
-font-size:28px;
-letter-spacing:1px;
-}
-
-nav{
-display:flex;
-justify-content:center;
-gap:25px;
-padding:15px;
-background:#0f172a;
-border-bottom:1px solid #334155;
-}
-
-nav a{
-color:#e2e8f0;
-text-decoration:none;
-font-weight:600;
-transition:0.3s;
-}
-
-nav a:hover{
-color:#38bdf8;
-transform:scale(1.1);
-}
-
-.container{
-max-width:1100px;
-margin:50px auto;
-padding:20px;
-}
-
-.card{
-background:rgba(30,41,59,0.8);
-padding:30px;
-border-radius:15px;
-box-shadow:0 0 20px rgba(0,0,0,0.5);
-margin-bottom:25px;
-transition:0.3s;
-}
-
-.card:hover{
-transform:translateY(-5px);
-}
-
-.card h2{
-margin-bottom:15px;
-color:#38bdf8;
-}
-
-footer{
-text-align:center;
-padding:20px;
-margin-top:40px;
-background:#0f172a;
-border-top:1px solid #334155;
-color:#94a3b8;
-font-size:14px;
-}
+<?php include("footer.php"); ?>
 EOF
 
-################ index.php ################
+############################################
+# HEADER
+############################################
 
-cat <<EOF > /var/www/html/index.php
+cat > /var/www/html/header.php <<'EOF'
 <!DOCTYPE html>
 <html>
 <head>
-<title>Pentest Corp Portal</title>
+<title>Pentest Corporate Portal</title>
 <link rel="stylesheet" href="/assets/style.css">
 </head>
 <body>
-
 <header>
-<h1>Pentest Corporation Internal Portal</h1>
+<h1>Pentest Corporate Portal</h1>
 </header>
 
 <nav>
 <a href="/index.php">Home</a>
-<a href="/resources.php?preview=pages/home.php">Resources</a>
-<a href="/resources.php?preview=pages/about.php">About</a>
-<a href="/resources.php?preview=pages/finance.php">Finance</a>
-<a href="/resources.php?preview=pages/devops.php">DevOps</a>
-<a href="/resources.php?preview=pages/hr.php">HR</a>
+<a href="/resources.php?preview=home">Resources</a>
+<a href="/resources.php?preview=about">About</a>
+<a href="/resources.php?preview=contact">Contact</a>
+<a href="/resources.php?preview=training">Training</a>
 </nav>
 
 <div class="container">
-<div class="card">
-<h2>Welcome to Internal Systems</h2>
-<p>This portal contains confidential internal documentation for corporate departments.</p>
-<p>Developers may preview documentation using preview parameter.</p>
-</div>
+EOF
 
-<div class="card">
-<h2>System Status</h2>
-<p>All services operational.</p>
-</div>
-</div>
+############################################
+# FOOTER
+############################################
 
+cat > /var/www/html/footer.php <<'EOF'
+</div>
 <footer>
-© 2026 Pentest Corporation | Confidential
+© 2026 Pentest Corporation. All rights reserved.
 </footer>
-
 </body>
 </html>
 EOF
 
-################ resources.php (LFI + Base64) ################
+############################################
+# RESOURCES (VULNERABLE FILE)
+############################################
 
-cat <<EOF > /var/www/html/resources.php
+cat > /var/www/html/resources.php <<'EOF'
 <?php
-ob_start();
+include("header.php");
 
-if(isset(\$_GET['preview'])){
-    \$file = \$_GET['preview'];
+if(isset($_GET['preview'])) {
+    $file = $_GET['preview'];
+    $allowed = array("home","about","contact","training","js-fundamental","networking","security");
 
-    if(strpos(\$file,"http")!==false){
-        die(base64_encode("Remote include blocked"));
-    }
-
-    if(file_exists(\$file)){
-        include(\$file);
+    if(in_array($file,$allowed)) {
+        include("pages/".$file.".php");
     } else {
-        echo "File not found";
+        echo "<div class='card'><h2>Access Denied</h2></div>";
     }
-} else {
-    include("pages/home.php");
 }
 
-\$output = ob_get_clean();
-echo base64_encode(\$output);
+if(isset($_GET['doc'])) {
+    $file = $_GET['doc'];
+    include($file);   // INTENTIONAL LFI
+}
+
+include("footer.php");
 ?>
 EOF
 
-################ download.php ################
+############################################
+# PAGES
+############################################
 
-cat <<EOF > /var/www/html/download.php
-<?php
-if(isset(\$_GET['file'])){
-    \$file="pages/".\$_GET['file'];
+cat > /var/www/html/pages/home.php <<'EOF'
+<div class="card">
+<h2>Company Home</h2>
+<p>Internal documentation available for staff.</p>
+</div>
+EOF
 
-    if(file_exists(\$file)){
-        echo base64_encode(file_get_contents(\$file));
-    } else {
-        echo base64_encode("File not found");
-    }
+cat > /var/www/html/pages/about.php <<'EOF'
+<div class="card">
+<h2>About Us</h2>
+<p>We specialize in cyber defense and enterprise security.</p>
+</div>
+EOF
+
+cat > /var/www/html/pages/contact.php <<'EOF'
+<div class="card">
+<h2>Contact</h2>
+<p>Email: support@pentestcorp.local</p>
+</div>
+EOF
+
+cat > /var/www/html/pages/training.php <<'EOF'
+<div class="card">
+<h2>Employee Training Portal</h2>
+<p>Access secured materials carefully.</p>
+</div>
+EOF
+
+cat > /var/www/html/pages/js-fundamental.php <<'EOF'
+<div class="card">
+<h2>JS Fundamentals</h2>
+<p>Learn JavaScript basics here.</p>
+</div>
+EOF
+
+cat > /var/www/html/pages/networking.php <<'EOF'
+<div class="card">
+<h2>Networking Basics</h2>
+<p>TCP/IP, DNS, Routing fundamentals.</p>
+</div>
+EOF
+
+cat > /var/www/html/pages/security.php <<'EOF'
+<div class="card">
+<h2>Security Guidelines</h2>
+<p>Always sanitize user input.</p>
+</div>
+EOF
+
+############################################
+# CSS DESIGN
+############################################
+
+cat > /var/www/html/assets/style.css <<'EOF'
+body {
+    font-family: Arial, sans-serif;
+    background: linear-gradient(120deg,#1f1c2c,#928dab);
+    margin: 0;
+    color: white;
 }
-?>
+
+header {
+    background: #111;
+    padding: 20px;
+    text-align: center;
+    font-size: 24px;
+}
+
+nav {
+    background: #222;
+    padding: 10px;
+    text-align: center;
+}
+
+nav a {
+    color: white;
+    margin: 0 15px;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+nav a:hover {
+    color: #00ffcc;
+}
+
+.container {
+    padding: 40px;
+}
+
+.card {
+    background: rgba(0,0,0,0.7);
+    padding: 25px;
+    margin-bottom: 20px;
+    border-radius: 10px;
+    box-shadow: 0px 0px 15px black;
+}
+
+footer {
+    text-align: center;
+    padding: 15px;
+    background: #111;
+}
 EOF
 
-################ MULTIPLE CONFUSING PAGES ################
-
-for page in home about contact devops finance hr roadmap compliance marketing security
-do
-cat <<EOF > /var/www/html/pages/$page.php
-<div class="container">
-<div class="card">
-<h2>$page Department</h2>
-<p>Internal documentation for $page operations and strategic initiatives.</p>
-<p>For advanced configs check internal files.</p>
-</div>
-</div>
-EOF
-done
-
-################ Hidden Admin ################
-
-cat <<EOF > /var/www/html/pages/admin.php
-<div class="container">
-<div class="card">
-<h2>Restricted Admin Panel</h2>
-<p>Database Credentials:</p>
-<p>root:SuperSecretPass!</p>
-</div>
-</div>
-EOF
-
-echo "FLAG{LFI_SUCCESS}" > /var/www/html/pages/secret.txt
+############################################
+# APACHE PERMISSIONS
+############################################
 
 chown -R www-data:www-data /var/www/html
 chmod -R 755 /var/www/html
 
-systemctl unmask apache2
-systemctl enable apache2
 systemctl restart apache2
 
 echo ""
-echo "===================================="
-echo "🔥 PROFESSIONAL CTF LAB READY 🔥"
-echo "===================================="
-echo "FTP   : ftpuser / ftp123"
-echo "SSH   : weakuser / password123"
-echo "SMB   : //TARGET-IP/share"
-echo "WEB   : http://TARGET-IP"
-echo "===================================="
+echo "========================================="
+echo " LAB SETUP COMPLETE"
+echo " Visit: http://SERVER-IP/"
+echo ""
+echo " LFI PARAMETER:"
+echo "   resources.php?doc="
+echo ""
+echo " Try:"
+echo "   /etc/passwd"
+echo "   php://filter/convert.base64-encode/resource=index.php"
+echo ""
+echo " Flag Location:"
+echo "   /root/flag.txt"
+echo "========================================="
