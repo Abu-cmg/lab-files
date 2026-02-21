@@ -3,57 +3,55 @@
 echo "[+] Updating system..."
 apt update -y
 
-echo "[+] Installing required packages..."
-apt install -y apache2 php libapache2-mod-php samba openssh-server vsftpd
+echo "[+] Installing Apache & PHP..."
+apt install -y apache2 php libapache2-mod-php
 
-#################################################
-# 1️⃣ FTP SETUP
-#################################################
+echo "[+] Installing build tools..."
+apt install -y build-essential wget unzip
 
-echo "[+] Setting up FTP..."
+echo "[+] Installing SMB..."
+apt install -y samba
 
-useradd -m ftpuser
-echo "ftpuser:ftp123" | chpasswd
+echo "[+] Installing Hydra + wordlists..."
 
-echo "nothing here" > /home/ftpuser/imp.txt
-chown ftpuser:ftpuser /home/ftpuser/imp.txt
+echo "[+] Installing vulnerable VSFTPD 2.3.4..."
 
+cd /tmp
+wget https://security.appspot.com/downloads/vsftpd-2.3.4.tar.gz
+tar -xvzf vsftpd-2.3.4.tar.gz
+cd vsftpd-2.3.4
+
+make
+cp vsftpd /usr/local/sbin/vsftpd
+
+mkdir -p /etc/vsftpd
 cat <<EOF > /etc/vsftpd.conf
 listen=YES
 anonymous_enable=NO
 local_enable=YES
 write_enable=YES
-chroot_local_user=YES
-allow_writeable_chroot=YES
+local_umask=022
+background=NO
 EOF
 
-systemctl restart vsftpd
+echo "[+] Creating FTP user..."
+useradd -m ftpuser
+echo "ftpuser:ftp123" | chpasswd
 
-#################################################
-# 2️⃣ WEAK SSH USER
-#################################################
+echo "nothing here" > /home/ftpuser/imp.txt
+chmod 777 /home/ftpuser/imp.txt
 
-echo "[+] Creating weak SSH user..."
+echo "[+] Starting vulnerable VSFTPD..."
+/usr/local/sbin/vsftpd /etc/vsftpd.conf &
 
-useradd -m weakuser
-echo "weakuser:password123" | chpasswd
-
-sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
-systemctl restart ssh
-
-#################################################
-# 3️⃣ SMB VULNERABLE SHARE
-#################################################
-
-echo "[+] Setting up SMB share..."
-
+echo "[+] Configuring SMB vulnerable share..."
 mkdir -p /srv/smbshare
 chmod 777 /srv/smbshare
-echo "flag{smb_vulnerable}" > /srv/smbshare/flag.txt
+echo "SMB SECRET FLAG" > /srv/smbshare/flag.txt
 
 cat <<EOF >> /etc/samba/smb.conf
 
-[pentestshare]
+[share]
    path = /srv/smbshare
    browsable = yes
    writable = yes
@@ -63,210 +61,125 @@ EOF
 
 systemctl restart smbd
 
-#################################################
-# 4️⃣ PROFESSIONAL WEB APP
-#################################################
+echo "[+] Creating weak SSH user..."
+useradd -m weakuser
+echo "weakuser:password123" | chpasswd
+
+echo "[+] Setting up vulnerable web app..."
 echo "[+] Unmasking and starting Apache..."
 
 systemctl unmask apache2
 systemctl enable apache2
 systemctl start apache2
-echo "[+] Setting up professional vulnerable web app..."
-
 mkdir -p /var/www/html/assets
 mkdir -p /var/www/html/pages
 
-################ CSS ################
-
+# CSS
 cat <<EOF > /var/www/html/assets/style.css
-body {
-    margin: 0;
-    font-family: 'Segoe UI', sans-serif;
-    background: #0f172a;
-    color: #e2e8f0;
-}
-header {
-    background: #1e293b;
-    padding: 20px;
-    text-align: center;
-}
-header h1 {
-    margin: 0;
-    color: #38bdf8;
-}
-nav {
-    background: #0f172a;
-    padding: 15px;
-    text-align: center;
-}
-nav a {
-    color: #e2e8f0;
-    text-decoration: none;
-    margin: 0 20px;
-    font-weight: bold;
-}
-nav a:hover {
-    color: #38bdf8;
-}
-.container {
-    padding: 40px;
-    max-width: 1000px;
-    margin: auto;
-}
-.card {
-    background: #1e293b;
-    padding: 25px;
-    border-radius: 8px;
-    margin-bottom: 20px;
-    box-shadow: 0 0 10px rgba(0,0,0,0.5);
-}
-button {
-    background: #38bdf8;
-    border: none;
-    padding: 10px 20px;
-    color: #000;
-    font-weight: bold;
-    border-radius: 5px;
-    cursor: pointer;
-}
-button:hover {
-    background: #0ea5e9;
-}
-footer {
-    background: #1e293b;
-    text-align: center;
-    padding: 20px;
-    margin-top: 40px;
-    color: #94a3b8;
-}
+body {background:#0f172a;color:#e2e8f0;font-family:Segoe UI;margin:0}
+header{background:#1e293b;padding:20px;text-align:center}
+nav{background:#0f172a;padding:15px;text-align:center}
+nav a{color:#e2e8f0;margin:15px;text-decoration:none}
+nav a:hover{color:#38bdf8}
+.container{padding:40px}
+.card{background:#1e293b;padding:20px;border-radius:8px;margin-bottom:20px}
+footer{background:#1e293b;text-align:center;padding:20px;margin-top:40px}
 EOF
 
-################ HEADER TEMPLATE ################
-
-cat <<EOF > /var/www/html/pages/header.php
+# index.php
+cat <<EOF > /var/www/html/index.php
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Pentest Lab Portal</title>
-    <link rel="stylesheet" href="/assets/style.css">
+<title>Pentest Corp Portal</title>
+<link rel="stylesheet" href="/assets/style.css">
 </head>
 <body>
-<header>
-    <h1>Pentest Corporate Portal</h1>
-</header>
+<header><h1>Pentest Corporation</h1></header>
 <nav>
-    <a href="/index.php">Home</a>
-    <a href="/resources.php?preview=home">Resources</a>
-    <a href="/resources.php?preview=about">About</a>
-    <a href="/resources.php?preview=contact">Contact</a>
+<a href="/index.php">Home</a>
+<a href="/resources.php?preview=pages/home.php">Resources</a>
+<a href="/resources.php?preview=pages/about.php">About</a>
+<a href="/resources.php?preview=pages/contact.php">Contact</a>
+<a href="/resources.php?preview=pages/devops.php">DevOps</a>
 </nav>
 <div class="container">
-EOF
-
-################ FOOTER ################
-
-cat <<EOF > /var/www/html/pages/footer.php
+<div class="card">
+<h2>Welcome</h2>
+<p>Internal Training Portal</p>
 </div>
-<footer>
-    © 2026 Pentest Corporation. All rights reserved.
-</footer>
+</div>
+<footer>© 2026 Pentest Corp</footer>
 </body>
 </html>
 EOF
 
-################ INDEX ################
-
-cat <<EOF > /var/www/html/index.php
-<?php include("pages/header.php"); ?>
-<div class="card">
-<h2>Welcome to Pentest Corporate Portal</h2>
-<p>This internal platform provides secure employee resources and documentation.</p>
-</div>
-<?php include("pages/footer.php"); ?>
-EOF
-
-################ NORMAL PAGES ################
-
-cat <<EOF > /var/www/html/pages/home.php
-<div class="card">
-<h2>Employee Resources</h2>
-<p>Access training materials and internal documentation.</p>
-</div>
-EOF
-
-cat <<EOF > /var/www/html/pages/about.php
-<div class="card">
-<h2>About Company</h2>
-<p>We are a cybersecurity research and consulting company.</p>
-</div>
-EOF
-
-cat <<EOF > /var/www/html/pages/contact.php
-<div class="card">
-<h2>Contact Us</h2>
-<p>Email: admin@pentest.local</p>
-</div>
-EOF
-
-cat <<EOF > /var/www/html/pages/js-fundamental.php
-<div class="card">
-<h2>JS Fundamentals</h2>
-<p>Learn JavaScript basics here.</p>
-</div>
-EOF
-
-cat <<EOF > /var/www/html/pages/admin.php
-<div class="card">
-<h2>Admin Panel</h2>
-<p>Restricted access area.</p>
-</div>
-EOF
-
-echo "flag{lfi_master}" > /var/www/html/pages/secret.txt
-
-################ LFI VULNERABLE FILE ################
-
+# LFI vulnerable resources.php
 cat <<EOF > /var/www/html/resources.php
 <?php
-include("pages/header.php");
-if(isset(\$_GET['preview'])){
-    include("pages/" . \$_GET['preview'] . ".php");
+if(isset(\$_GET['preview'])) {
+    \$file = \$_GET['preview'];
+    if(strpos(\$file,"http")!==false){die("Remote include blocked");}
+    include(\$file);
 } else {
-    echo "<div class='card'><h2>No file selected</h2></div>";
+    include("pages/home.php");
 }
-include("pages/footer.php");
 ?>
 EOF
 
-################ DIRECTORY TRAVERSAL ################
-
+# Directory traversal vuln
 cat <<EOF > /var/www/html/download.php
 <?php
-if(isset(\$_GET['file'])){
-    readfile(\$_GET['file']);
+if(isset(\$_GET['file'])) {
+    \$file = "pages/".$_GET['file'];
+    if(file_exists(\$file)){
+        echo file_get_contents(\$file);
+    } else {
+        echo "File not found";
+    }
 }
 ?>
 EOF
 
+# Pages
+for page in home about contact devops finance roadmap hr js-fundamental
+do
+cat <<EOF > /var/www/html/pages/$page.php
+<div class="container">
+<div class="card">
+<h2>$page</h2>
+<p>Internal documentation for $page department.</p>
+</div>
+</div>
+EOF
+done
+
+# Hidden admin page
+cat <<EOF > /var/www/html/pages/admin.php
+<div class="container">
+<div class="card">
+<h2>Admin Panel</h2>
+<p>DB Password: root:SuperSecretPass</p>
+</div>
+</div>
+EOF
+
+echo "FLAG{LFI_SUCCESS}" > /var/www/html/pages/secret.txt
+
+chown -R www-data:www-data /var/www/html
+chmod -R 755 /var/www/html
+
+systemctl unmask apache2
+systemctl enable apache2
 systemctl restart apache2
 
-#################################################
-
 echo ""
-echo "🔥 PENTEST LAB READY 🔥"
-echo "FTP: ftpuser / ftp123"
-echo "SSH: weakuser / password123"
-echo "SMB Share: pentestshare (guest access)"
-echo ""
-echo "Web:"
-echo "http://localhost"
-echo "LFI Example:"
-echo "http://localhost/resources.php?preview=../../../../etc/passwd"
-echo ""
-echo "php filter bypass:"
-echo "http://localhost/resources.php?preview=php://filter/convert.base64-encode/resource=resources"
-echo ""
-echo "Directory traversal:"
-echo "http://localhost/download.php?file=../../etc/passwd"
-echo ""
-echo "⚠️ Use inside isolated VM only!"
+echo "====================================="
+echo " Lab Setup Complete!"
+echo "====================================="
+echo "FTP  : ftpuser / ftp123"
+echo "SSH  : weakuser / password123"
+echo "SMB  : //target-ip/share (guest)"
+echo "Web  : http://target-ip"
+echo "FLAG : via LFI secret.txt"
+echo "====================================="
