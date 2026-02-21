@@ -66,7 +66,11 @@ systemctl restart smbd
 #################################################
 # 4️⃣ PROFESSIONAL WEB APP
 #################################################
+echo "[+] Unmasking and starting Apache..."
 
+systemctl unmask apache2
+systemctl enable apache2
+systemctl start apache2
 echo "[+] Setting up professional vulnerable web app..."
 
 mkdir -p /var/www/html/assets
