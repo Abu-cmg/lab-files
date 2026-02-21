@@ -34,6 +34,59 @@ mkdir -p /var/www/html/assets
 mkdir -p /var/www/html/pages
 
 ########################################
+# FTP SETUP (ANONYMOUS ENABLED)
+########################################
+
+echo "[+] Installing vsftpd..."
+apt install vsftpd -y
+
+echo "[+] Creating FTP directory..."
+mkdir -p /srv/ftp
+chmod 777 /srv/ftp
+
+echo "FLAG{FTP_ANONYMOUS_LOGIN_SUCCESS}" > /srv/ftp/ftp_flag.txt
+chmod 644 /srv/ftp/ftp_flag.txt
+
+echo "[+] Configuring vsftpd for anonymous login..."
+
+cat > /etc/vsftpd.conf <<'EOF'
+listen=YES
+listen_ipv6=NO
+
+anonymous_enable=YES
+local_enable=YES
+write_enable=YES
+
+anon_root=/srv/ftp
+
+anon_upload_enable=YES
+anon_mkdir_write_enable=YES
+anon_other_write_enable=YES
+
+no_anon_password=YES
+hide_ids=YES
+
+dirmessage_enable=YES
+use_localtime=YES
+xferlog_enable=YES
+
+connect_from_port_20=YES
+
+secure_chroot_dir=/var/run/vsftpd/empty
+
+pam_service_name=vsftpd
+
+pasv_enable=YES
+pasv_min_port=40000
+pasv_max_port=40100
+EOF
+
+echo "[+] Restarting FTP service..."
+systemctl restart vsftpd
+systemctl enable vsftpd
+
+echo "[+] FTP Anonymous setup complete."
+########################################
 # INDEX
 ########################################
 cat > /var/www/html/index.php <<'EOF'
