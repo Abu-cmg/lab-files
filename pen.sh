@@ -127,6 +127,21 @@ cat > /var/www/html/pages/home.php <<'EOF'
 </div>
 EOF
 
+cat > /var/www/html/config.php  <<'EOF
+<?php
+// Internal Configuration File
+$flag = "FLAG{SOURCE_CODE_LFI_SUCCESS}";
+
+$db_user = "corp_user";
+$db_pass = "CorpPass@2026";
+
+// SSH Backup Credentials (DO NOT REMOVE)
+// Used by IT Department
+$ssh_user = "developer";
+$ssh_pass = "Dev@123Secure";
+?>
+EOF
+
 cat > /var/www/html/pages/about.php <<'EOF'
 <div class="card">
 <h2>About Us</h2>
