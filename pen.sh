@@ -85,20 +85,31 @@ cat > /var/www/html/resources.php <<'EOF'
 <?php
 include("header.php");
 
+$valid = false;
+
 if(isset($_GET['preview'])) {
     $file = $_GET['preview'];
     $allowed = array("home","about","contact","training","js-fundamental","networking","security");
 
     if(in_array($file,$allowed)) {
         include("pages/".$file.".php");
+        $valid = true;
     } else {
-        echo "<div class='card'><h2>Access Denied</h2></div>";
+        http_response_code(404);
+        echo "<div class='card'><h2>Page Not Found</h2></div>";
+        $valid = true;
     }
 }
 
 if(isset($_GET['doc'])) {
     $file = $_GET['doc'];
-    include($file);   // INTENTIONAL LFI
+    include($file);   // vulnerable
+    $valid = true;
+}
+
+if(!$valid){
+    http_response_code(404);
+    echo "<div class='card'><h2>Invalid Parameter</h2></div>";
 }
 
 include("footer.php");
