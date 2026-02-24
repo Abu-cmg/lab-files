@@ -269,6 +269,23 @@ footer {
 EOF
 
 ########################################
+# PRIVILEGE ESCALATION (SUID BINARIES)
+########################################
+
+echo "[+] Adding SUID misconfiguration..."
+
+# Add hidden root-only flag for SUID escalation path
+echo "FLAG{SUID_PRIV_ESC_SUCCESS}" > /root/suid_root_flag.txt
+chmod 600 /root/suid_root_flag.txt
+
+# Add SUID to find
+chmod u+s /usr/bin/find
+
+# Add SUID to vim
+chmod u+s /usr/bin/vim
+
+echo "[+] SUID privilege escalation paths created."
+########################################
 # PERMISSIONS
 ########################################
 chown -R www-data:www-data /var/www/html
