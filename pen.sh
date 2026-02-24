@@ -285,6 +285,23 @@ chmod u+s /usr/bin/find
 chmod u+s /usr/bin/vim
 
 echo "[+] SUID privilege escalation paths created."
+
+########################################
+# POST-ROOT FLAG IN /home (ROOT ONLY)
+########################################
+
+echo "[+] Creating hidden root flag in /home..."
+
+mkdir -p /home/.system_backup
+
+echo "FLAG{HOME_ROOT_ACCESS_GRANTED}" > /home/.system_backup/final_flag.txt
+
+chown root:root /home/.system_backup/final_flag.txt
+chmod 600 /home/.system_backup/final_flag.txt
+
+chmod 700 /home/.system_backup
+
+echo "[+] Root-only home flag created."
 ########################################
 # PERMISSIONS
 ########################################
