@@ -292,10 +292,10 @@ echo "[+] SUID privilege escalation paths created."
 
 echo "[+] Creating root-only flag inside developer home..."
 
-echo "FLAG{DEVELOPER_HOME_ROOT_ACCESS}" > /home/developer/.root_flag.txt
+echo "FLAG{DEVELOPER_HOME_ROOT_ACCESS}" > /home/developer/root_flag.txt
 
-chown root:root /home/developer/.root_flag.txt
-chmod 600 /home/developer/.root_flag.txt
+chown root:root /home/developer/root_flag.txt
+chmod 600 /home/developer/root_flag.txt
 
 echo "[+] Root flag placed inside developer home."
 ########################################
