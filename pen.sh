@@ -292,9 +292,8 @@ echo "[+] SUID privilege escalation paths created."
 
 echo "[+] Creating hidden root flag in /home..."
 
-mkdir -p /home/.system_backup
 
-echo "FLAG{HOME_ROOT_ACCESS_GRANTED}" > /home/.system_backup/final_flag.txt
+echo "FLAG{HOME_ROOT_ACCESS_GRANTED}" > /home/developer/final_flag.txt
 
 chown root:root /home/.system_backup/final_flag.txt
 chmod 600 /home/.system_backup/final_flag.txt
