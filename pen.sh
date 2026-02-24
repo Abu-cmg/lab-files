@@ -16,6 +16,7 @@ systemctl start ssh
 echo "[+] Creating SSH user..."
 useradd -m developer
 echo "developer:Dev@123Secure" | chpasswd
+chmod 755 /home/developer
 
 echo "[+] Creating user flag..."
 echo "FLAG{USER_ACCESS_GRANTED}" > /home/developer/user.txt
