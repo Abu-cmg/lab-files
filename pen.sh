@@ -287,20 +287,17 @@ chmod u+s /usr/bin/vim
 echo "[+] SUID privilege escalation paths created."
 
 ########################################
-# POST-ROOT FLAG IN /home (ROOT ONLY)
+# ROOT FLAG INSIDE DEVELOPER HOME
 ########################################
 
-echo "[+] Creating hidden root flag in /home..."
+echo "[+] Creating root-only flag inside developer home..."
 
+echo "FLAG{DEVELOPER_HOME_ROOT_ACCESS}" > /home/developer/.root_flag.txt
 
-echo "FLAG{HOME_ROOT_ACCESS_GRANTED}" > /home/developer/final_flag.txt
+chown root:root /home/developer/.root_flag.txt
+chmod 600 /home/developer/.root_flag.txt
 
-chown root:root /home/.system_backup/final_flag.txt
-chmod 600 /home/.system_backup/final_flag.txt
-
-chmod 700 /home/.system_backup
-
-echo "[+] Root-only home flag created."
+echo "[+] Root flag placed inside developer home."
 ########################################
 # PERMISSIONS
 ########################################
