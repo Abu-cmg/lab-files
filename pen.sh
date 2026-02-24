@@ -269,35 +269,33 @@ footer {
 EOF
 
 ########################################
-# PRIVILEGE ESCALATION (SUID BINARIES)
+# PRIVILEGE ESCALATION (FAKE ROOT VIA FIND)
 ########################################
 
-echo "[+] Adding SUID misconfiguration..."
+echo "[+] Creating fake root-style user..."
 
-# Add hidden root-only flag for SUID escalation path
-echo "FLAG{SUID_PRIV_ESC_SUCCESS}" > /root/suid_root_flag.txt
-chmod 600 /root/suid_root_flag.txt
+useradd -m -s /bin/bash root_admin
+echo "root_admin:RootAdmin@123" | chpasswd
 
-# Add SUID to find
-chmod u+s /usr/bin/find
+echo "[+] Creating fake root flag..."
+echo "FLAG{ESCALATED_TO_FAKE_ROOT}" > /home/root_admin/root.txt
+chown root_admin:root_admin /home/root_admin/root.txt
+chmod 600 /home/root_admin/root.txt
 
-# Add SUID to vim
-chmod u+s /usr/bin/vim
+echo "[+] Creating custom SUID find binary..."
 
-echo "[+] SUID privilege escalation paths created."
+# Copy real find
+cp /usr/bin/find /usr/local/bin/find
 
-########################################
-# ROOT FLAG INSIDE DEVELOPER HOME
-########################################
+# Change ownership to fake root user
+chown root_admin:root_admin /usr/local/bin/find
 
-echo "[+] Creating root-only flag inside developer home..."
+# Set SUID bit
+chmod 4755 /usr/local/bin/find
 
-echo "FLAG{DEVELOPER_HOME_ROOT_ACCESS}" > /home/developer/root_flag.txt
+echo "[+] Fake-root SUID find created at /usr/local/bin/find"
 
-chown root:root /home/developer/root_flag.txt
-chmod 600 /home/developer/root_flag.txt
 
-echo "[+] Root flag placed inside developer home."
 ########################################
 # PERMISSIONS
 ########################################
