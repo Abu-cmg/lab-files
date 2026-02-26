@@ -107,7 +107,7 @@ LABS = {'Linux – Sudo PrivEsc': ('sudo_privesc', 'Gain root via sudo misconfig
  'Web – File Upload': ('web_upload', 'Exploit insecure file upload handling.'),
  'Web – SQL Injection': ('web_sqli', 'Practise SQLi against a vulnerable app.'),
  'Web – XSS': ('web_xss', 'Learn about XSS (Cross-Site Scripting) and how to defend against it.'),
- 'Pentest': ('ab', 'Get root_admin by exploiting various vulnerabilities in a  Linux environment .'),
+ 'Exploitation Techniques & Web Attacks': ('ab', 'Get root_admin by exploiting various vulnerabilities in a  Linux environment .'),
  'Privelege Escaltion': ('fsdfd', 'try your privelege escalation skills'),
  'Red teams': ('net', 'Red team your way through a vulnerable network'),
  'IOT': ('asds', 'deep dive into IOT vulnerabilities'),
@@ -118,7 +118,7 @@ LABS = {'Linux – Sudo PrivEsc': ('sudo_privesc', 'Gain root via sudo misconfig
 
 # Optional per-lab difficulty mapping (title -> 'Easy'|'Medium'|'Hard')
 LAB_DIFFICULTY = {
-	'Pentest': 'Hard',
+	'Exploitation Techniques & Web Attacks': 'Hard',
 	'Linux – Sudo PrivEsc': 'Hard',
 	'Web – File Upload': 'Medium',
 	'Web – SQL Injection': 'Easy',
@@ -1640,8 +1640,33 @@ class LabWindow(QMainWindow):
 			# remember last updated path for possible system install
 			self._last_update_path = dest_path
 			self.log(f"[+] Update completed: {dest_path}")
-			# If the updated path is under /opt, advise restart; else provide manual install instructions
+			# If the updated path is under /opt, attempt to ensure ownership and advise restart;
+			# otherwise provide manual install instructions.
 			if os.path.abspath(dest_path).startswith(os.path.sep + 'opt'):
+				# Try to ensure the file is owned by the configured ROOT_USER
+				try:
+					if os.name != 'nt':
+						# First attempt non-interactive sudo chown
+						if shutil.which('sudo'):
+							r = subprocess.run(['sudo', '-n', 'chown', f'{ROOT_USER}:{ROOT_USER}', dest_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+							if r.returncode == 0:
+								self.log(f"[+] Set ownership: {dest_path} -> {ROOT_USER}:{ROOT_USER} (non-interactive)")
+							else:
+								# Fall back to launching an elevated helper script so the user can authenticate
+								script_path = None
+								try:
+									fd, script_path = tempfile.mkstemp(prefix='chown_', suffix='.sh', dir=tempfile.gettempdir())
+									os.close(fd)
+									with open(script_path, 'w', encoding='utf-8') as sf:
+										sf.write('#!/bin/sh\n')
+										sf.write('exec chown %s:%s %s\n' % (ROOT_USER, ROOT_USER, shlex.quote(dest_path)))
+									os.chmod(script_path, 0o755)
+									threading.Thread(target=self._run_as_admin, args=(script_path,), daemon=True).start()
+									self.log(f"[+] Launched elevation to set ownership for: {dest_path}")
+								except Exception:
+									pass
+				except Exception as e:
+					self.log(f"[WARN] Ownership fixup failed: {e}")
 				QMessageBox.information(self, 'Update complete', f'Updated: {dest_path}\n\nPlease restart the application for changes to take effect.')
 			else:
 				QMessageBox.information(self, 'Update saved (manual install required)',
