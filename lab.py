@@ -1343,6 +1343,15 @@ class LabWindow(QMainWindow):
 				if os.name != 'nt':
 					st = os.stat(dest)
 					os.chmod(dest, st.st_mode | stat.S_IEXEC)
+					# Attempt to set ownership to antori:antori when available
+					try:
+						import pwd, grp
+						uid = pwd.getpwnam('antori').pw_uid
+						gid = grp.getgrnam('antori').gr_gid
+						os.chown(dest, uid, gid)
+						self.output_signal.emit('[+] Ownership set to antori:antori')
+					except Exception:
+						pass
 			except Exception as e:
 				self.output_signal.emit(f"[WARN] chmod failed: {e}")
 
@@ -1580,6 +1589,15 @@ class LabWindow(QMainWindow):
 					if os.name != 'nt':
 						st = os.stat(user_dest)
 						os.chmod(user_dest, st.st_mode | stat.S_IEXEC)
+						# Attempt to set ownership to antori:antori when available
+						try:
+							import pwd, grp
+							uid = pwd.getpwnam('antori').pw_uid
+							gid = grp.getgrnam('antori').gr_gid
+							os.chown(user_dest, uid, gid)
+							self.output_signal.emit('[+] Ownership set to antori:antori')
+						except Exception:
+							pass
 				except Exception:
 					pass
 				try:
@@ -1598,6 +1616,15 @@ class LabWindow(QMainWindow):
 								shutil.copy2(user_dest, dest)
 								st = os.stat(dest)
 								os.chmod(dest, st.st_mode | stat.S_IEXEC)
+								# Attempt to set ownership to antori:antori on installed path
+								try:
+									import pwd, grp
+									uid = pwd.getpwnam('antori').pw_uid
+									gid = grp.getgrnam('antori').gr_gid
+									os.chown(dest, uid, gid)
+									self.output_signal.emit('[+] Ownership set to antori:antori')
+								except Exception:
+									pass
 								installed_dest = dest
 								self.output_signal.emit(f"[+] Installed updated script to {dest} (running as root)")
 						except Exception:
