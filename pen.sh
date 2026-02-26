@@ -270,15 +270,11 @@ footer {
 EOF
 
 ########################################
-# PRIVILEGE ESCALATION (FAKE ROOT VIA FIND)
+# PRIVILEGE ESCALATION 
 ########################################
-
-echo "[+] Creating fake root-style user..."
 
 useradd -m -s /bin/bash root_admin
 echo "root_admin:RootAdmin@123" | chpasswd
-
-echo "[+] Creating fake root flag..."
 echo "FLAG{ESCALATED_TO_FAKE_ROOT}" > /home/root_admin/root.txt
 chown root_admin:root_admin /home/root_admin/root.txt
 chmod 600 /home/root_admin/root.txt
@@ -294,8 +290,6 @@ chown root_admin:root_admin /usr/local/bin/find
 # Set SUID bit
 chmod 4755 /usr/local/bin/find
 
-echo "[+] Fake-root SUID find created at /usr/local/bin/find"
-
 
 ########################################
 # PERMISSIONS
@@ -305,19 +299,14 @@ chmod -R 755 /var/www/html
 
 systemctl restart apache2
 
-echo ""
+#!/bin/bash
+
+RED="\e[31m"
+RESET="\e[0m"
+
+echo -e "${RED}"
 echo "======================================"
 echo " LAB READY"
 echo " Target: http://SERVER-IP/"
-echo ""
-echo " FLAGS:"
-echo " 1) LFI flag inside config.php"
-echo " 2) user.txt in developer home"
-echo " 3) root.txt via privesc"
-echo ""
-echo " SSH USER:"
-echo " developer : Dev@123Secure"
-echo ""
-echo " SUDO MISCONFIG:"
-echo " developer can run find as root"
 echo "======================================"
+echo -e "${RESET}"
