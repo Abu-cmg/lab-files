@@ -1,3 +1,4 @@
+
 import os
 import sys
 import threading
@@ -106,16 +107,27 @@ LABS = {'Linux – Sudo PrivEsc': ('sudo_privesc', 'Gain root via sudo misconfig
  'Web – File Upload': ('web_upload', 'Exploit insecure file upload handling.'),
  'Web – SQL Injection': ('web_sqli', 'Practise SQLi against a vulnerable app.'),
  'Web – XSS': ('web_xss', 'Learn about XSS (Cross-Site Scripting) and how to defend against it.'),
- 'asd': ('asda', 'sdasd'),
- 'dsfsd': ('fsdfd', 'zxcdds'),
- 'red teams': ('net', 'check'),
- 'sads': ('asds', 'das (Hard)'),
- 'HELLOO': ('sdW', 'JI'),
- 'sdk': ('sd', 'sdsd') }
+ 'Boot2root': ('ab', 'Get root_admin by exploiting various vulnerabilities in a  Linux environment .'),
+ 'Privelege Escaltion': ('fsdfd', 'try your privelege escalation skills'),
+ 'Red teams': ('net', 'Red team your way through a vulnerable network'),
+ 'IOT': ('asds', 'deep dive into IOT vulnerabilities'),
+ 'Cryto': ('sdW', 'Sharpen your crypto skills with rsa, aes, hashing and more'),
+ 'Enumertion': ('sd', 'enumerate network services and hosts') }
 
 
 # Optional per-lab difficulty mapping (title -> 'Easy'|'Medium'|'Hard')
-LAB_DIFFICULTY = {}
+LAB_DIFFICULTY = {
+	'Boot2root': 'Hard',
+	'Linux – Sudo PrivEsc': 'Hard',
+	'Web – File Upload': 'Medium',
+	'Web – SQL Injection': 'Easy',
+	'Web – XSS': 'Easy',
+	'Privelege Escaltion': 'Medium',
+	'Red teams': 'Hard',
+	'IOT': 'Medium',
+	'Cryto': 'Easy',
+	'Enumertion': 'Easy',
+}
 
 # Default scripts (can be overridden by env vars)
 INSTALL_SCRIPT = os.environ.get("INSTALL_SCRIPT", "/usr/local/bin/install_lab.sh")
@@ -131,7 +143,7 @@ LAB_INSTALLERS = {'asda': 'asd',
  'asds': 'asdsa',
  'fsdfd': 'sdf',
  'net': 'https://github.com/Abu-cmg/lab-files/blob/main/red.sh',
- 'sd': 'sadasd',
+ 'ab': 'https://github.com/Abu-cmg/lab-files/blob/main/pen.sh',
  'web_sqli': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/lab_web.sh.sh',
  'web_upload': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/upload.sh',
  'sd': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/upload.sh' }
@@ -590,6 +602,7 @@ class LabWindow(QMainWindow):
 		self.install_btn = QPushButton("Install Selected ▶")
 		self.reset_btn = QPushButton("Reset / Cleanup")
 		self.cancel_btn = QPushButton("Cancel")
+		self.restart_btn = QPushButton("Restart System")
 		self.shell_btn = QPushButton("Open Shell")
 		# Manage Labs button -- optional interface to add/edit lab cards at runtime
 		# This whole section is easily comment-able. To disable at runtime set
@@ -597,12 +610,20 @@ class LabWindow(QMainWindow):
 		# between the markers: MANAGE_UI_BLOCK START / END
 		self.manage_btn = QPushButton("Manage Labs")
 		left.addWidget(self.manage_btn)
+		# Hide and disable Manage Labs button per user request
+		try:
+			self.manage_btn.setVisible(False)
+			self.manage_btn.setEnabled(False)
+		except Exception:
+			pass
 
 		self.cancel_btn.setEnabled(False)
 		left.addWidget(QLabel("Actions", alignment=Qt.AlignmentFlag.AlignLeft))
 		left.addWidget(self.install_btn)
 		left.addWidget(self.reset_btn)
 		left.addWidget(self.cancel_btn)
+		# Restart button placed below Cancel
+		left.addWidget(self.restart_btn)
 		left.addWidget(self.shell_btn)
 		left.addStretch()
 
@@ -615,25 +636,37 @@ class LabWindow(QMainWindow):
 		)
 		# Give the Install button a purple -> pink gradient to stand out
 		self.install_btn.setStyleSheet(
-			"QPushButton{background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #7b2cbf, stop:1 #ff66b3);"
-			" color:#ffffff; border:1px solid rgba(255,255,255,0.04); border-radius:8px; padding:8px 12px;}"
-			"QPushButton:hover{border:1px solid #ff8ed6;}"
-			"QPushButton:disabled{background:#5a3a5a; color:#6a6a6a;}"
-		)
+    "QPushButton{background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #6a0dad, stop:1 #9d4edd);"
+    " color:#ffffff; border:1px solid rgba(255,255,255,0.04); border-radius:8px; padding:8px 12px;}"
+    "QPushButton:hover{border:1px solid #ff8ed6;}"
+    "QPushButton:disabled{background:#5a3a5a; color:#6a6a6a;}"
+)
 		# Reset and Cancel styled to match Install (purple -> pink gradient)
 		self.reset_btn.setStyleSheet(
-			"QPushButton{background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #7b2cbf, stop:1 #ff66b3);"
-			" color:#ffffff; border:1px solid rgba(255,255,255,0.04); border-radius:8px; padding:8px 12px;}"
-			"QPushButton:hover{border:1px solid #ff8ed6;}"
-			"QPushButton:disabled{background:#5a3a5a; color:#6a6a6a;}"
+    "QPushButton{background:#7b2cbf;"
+    " color:#ffffff; border:1px solid rgba(255,255,255,0.04); border-radius:8px; padding:8px 12px;}"
+    "QPushButton:hover{border:1px solid #ff8ed6;}"
+    "QPushButton:disabled{background:#5a3a5a; color:#6a6a6a;}"
 		)
 		self.cancel_btn.setStyleSheet(
-			"QPushButton{background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #7b2cbf, stop:1 #ff66b3);"
+			 "QPushButton{background:#7b2cbf;"
+    " color:#ffffff; border:1px solid rgba(255,255,255,0.04); border-radius:8px; padding:8px 12px;}"
+    "QPushButton:hover{border:1px solid #ff8ed6;}"
+    "QPushButton:disabled{background:#5a3a5a; color:#6a6a6a;}"
+		)
+		# Restart button styled with cautionary red
+		self.restart_btn.setStyleSheet(
+			"QPushButton{background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #ff4d4f, stop:1 #c40000);"
 			" color:#ffffff; border:1px solid rgba(255,255,255,0.04); border-radius:8px; padding:8px 12px;}"
-			"QPushButton:hover{border:1px solid #ff8ed6;}"
-			"QPushButton:disabled{background:#5a3a5a; color:#6a6a6a;}"
+			"QPushButton:hover{border:1px solid #ffb3b3;}"
+			"QPushButton:disabled{background:#8a2b2b; color:#6a6a6a;}"
 		)
 		self.shell_btn.setStyleSheet(btn_style)
+		# connect restart handler
+		try:
+			self.restart_btn.clicked.connect(self.restart_system)
+		except Exception:
+			pass
 
 		self.left_container = QWidget()
 		self.left_container.setLayout(left)
@@ -761,7 +794,7 @@ class LabWindow(QMainWindow):
 		try:
 			title_lbl = QLabel("HKQ's Practice Labs")
 			title_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-			title_lbl.setStyleSheet('color:#ff66b3; font-size:18px; font-weight:800; padding:6px 0;')
+			title_lbl.setStyleSheet('color:#9370db; font-size:18px; font-weight:800; padding:6px 0;')
 			wrapper.addWidget(title_lbl)
 		except Exception:
 			pass
@@ -781,7 +814,7 @@ class LabWindow(QMainWindow):
 			# Current installed lab display (top-left)
 			try:
 				self.current_lab_lbl = QLabel("Current Lab: None")
-				self.current_lab_lbl.setStyleSheet('color:#ff66b3; font-weight:700; padding:6px 0;')
+				self.current_lab_lbl.setStyleSheet('color:#ffffff; font-weight:700; padding:6px 0;')
 				ctrl_layout.addWidget(self.current_lab_lbl)
 			except Exception:
 				pass
@@ -927,7 +960,12 @@ class LabWindow(QMainWindow):
 		self.update_done_signal.connect(self._on_update_done)
 		self.install_btn.clicked.connect(self.install_lab)
 		self.reset_btn.clicked.connect(self.reset_lab)
-		self.shell_btn.clicked.connect(self.open_shell)
+		# Open Shell button disabled and hidden per user request
+		try:
+			self.shell_btn.setVisible(False)
+			self.shell_btn.setEnabled(False)
+		except Exception:
+			pass
 		# Update button: download replacement script and notify user to restart
 		try:
 			self.update_btn = QPushButton("Update")
@@ -935,11 +973,11 @@ class LabWindow(QMainWindow):
 			# Give the Update button a purple -> pink gradient to match Install button
 			try:
 				self.update_btn.setStyleSheet(
-					"QPushButton{background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #7b2cbf, stop:1 #ff66b3);"
-					" color:#ffffff; border:1px solid rgba(255,255,255,0.04); border-radius:8px; padding:8px 12px;}"
-					"QPushButton:hover{border:1px solid #ff8ed6;}"
-					"QPushButton:disabled{background:#5a3a5a; color:#6a6a6a;}"
-				)
+					 "QPushButton{background:#7b2cbf;"
+    " color:#ffffff; border:1px solid rgba(255,255,255,0.04); border-radius:8px; padding:8px 12px;}"
+    "QPushButton:hover{border:1px solid #ff8ed6;}"
+    "QPushButton:disabled{background:#5a3a5a; color:#6a6a6a;}"
+)
 			except Exception:
 				pass
 		except Exception:
@@ -1091,14 +1129,12 @@ class LabWindow(QMainWindow):
 	def _open_manage_ui(self):
 		# convenience wrapper to open the manage dialog. The manage UI can be
 		# commented out entirely by removing the MANAGE UI BLOCK in this file.
+		# Manage UI intentionally disabled. Keep a no-op placeholder so callers
+		# won't error; log for visibility.
 		try:
-			D = ManageLabsDialog(self)
-			D.exec()
-		except NameError:
-			# Manage UI block removed or commented out
-			self.log('[!] Manage UI not available (commented out)')
-		except Exception as e:
-			self.log(f'[ERROR] Failed to open Manage UI: {e}')
+			self.log('[!] Manage Labs UI disabled')
+		except Exception:
+			pass
 
 
 	def _arrange_cards(self):
@@ -1240,13 +1276,28 @@ class LabWindow(QMainWindow):
 			name = f"lab_{lab_code}.sh" if lab_code else f"lab_download_{int(time.time())}.sh"
 			dest = os.path.join(tmp, name)
 			raw = url
-			self.output_signal.emit(f"[+] Downloading {url} to {dest}")
+			def _mask(u: str) -> str:
+				try:
+					if not u:
+						return ''
+					lu = u.lower()
+					if 'abu-cmg' in lu or 'abu_cmg' in lu or 'abu cmg' in lu:
+						return '[github source redacted]'
+					return u
+				except Exception:
+					return u
+
+			self.output_signal.emit(f"[+] Downloading {_mask(url)} to {dest}")
 			# Normalize known VCS URLs to raw content URLs (GitHub /blob/ -> raw.githubusercontent)
 			raw = raw.strip()
 			try:
 				if 'github.com' in raw and '/blob/' in raw:
 					raw = raw.replace('https://github.com/', 'https://raw.githubusercontent.com/').replace('http://github.com/', 'http://raw.githubusercontent.com/').replace('/blob/', '/')
-					self.output_signal.emit(f"[+] Normalized GitHub blob URL to raw: {raw}")
+					# Avoid printing full source links for Abu-cmg repositories
+					if 'abu-cmg' in raw.lower() or 'abu_cmg' in raw.lower() or 'abu cmg' in raw.lower():
+						self.output_signal.emit("[+] Normalized GitHub blob URL to raw (redacted)")
+					else:
+						self.output_signal.emit(f"[+] Normalized GitHub blob URL to raw: {raw}")
 			except Exception:
 				pass
 			# prefer curl for robust downloads
@@ -1270,16 +1321,20 @@ class LabWindow(QMainWindow):
 			# Normalize line endings
 			try:
 				if shutil.which('dos2unix'):
-					self.output_signal.emit('[+] Running dos2unix on script')
-					subprocess.check_call(['dos2unix', dest])
+					try:
+						subprocess.check_call(['dos2unix', dest])
+						self.output_signal.emit('[+] Line endings normalized (redacted)')
+					except Exception:
+						# Don't expose dos2unix stderr to console
+						self.output_signal.emit('[+] Line endings normalized (redacted)')
 				else:
 					with open(dest, 'rb') as f:
 						data = f.read()
 					if b"\r\n" in data:
-						self.output_signal.emit('[+] Converting CRLF -> LF')
 						data = data.replace(b"\r\n", b"\n")
 						with open(dest, 'wb') as f:
 							f.write(data)
+						self.output_signal.emit('[+] Line endings normalized (redacted)')
 			except Exception as e:
 				self.output_signal.emit(f"[WARN] Failed to normalize line endings: {e}")
 
@@ -1761,47 +1816,50 @@ class LabWindow(QMainWindow):
 		except Exception as e:
 			self.log(f"[ERROR] Failed to terminate: {e}")
 
-	def open_shell(self):
-		"""Try to launch a terminal emulator for interactive debugging.
-		Falls back to a user-visible message if no terminal found.
+	def restart_system(self):
+		"""Prompt and attempt to restart the host (Linux/Debian).
+		Uses `systemctl reboot` then falls back to `shutdown -r now` or `reboot`.
+		Logs progress to the UI output via `output_signal` so background attempts don't touch GUI widgets.
 		"""
-		# common terminal emulator launch commands (command, args...)
-		# Try common terminal emulators, prefer launching /bin/bash directly.
-		candidates = [
-			['gnome-terminal','--','/bin/bash','-i'],
-			['lxterminal','-e','/bin/bash'],
-			['x-terminal-emulator','-e','/bin/bash'],
-			['xterm','-e','/bin/bash'],
-			['konsole','-e','/bin/bash'],
-			['urxvt','-e','/bin/bash'],
-		]
-		# Windows fallbacks (Windows Terminal, PowerShell, cmd)
-		win_candidates = [
-			['wt','-w','0','new-tab','pwsh'],
-			['powershell.exe'],
-			['cmd.exe'],
-		]
-		for cmd in candidates:
-			if shutil.which(cmd[0]):
+		# Confirm with user
+		try:
+			resp = QMessageBox.question(self, 'Confirm Restart', 'Restart the system now? This will reboot the host.', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+		except Exception:
+			# If QMessageBox unavailable for any reason, require explicit return
+			return
+		if resp != QMessageBox.StandardButton.Yes:
+			return
+		# Only attempt on Linux
+		if not sys.platform.startswith('linux'):
+			QMessageBox.warning(self, 'Unsupported', 'Restart is supported only on Linux (Debian).')
+			return
+		self.log('[!] Initiating system restart...')
+
+		def _do_restart():
+			# Use output_signal so background thread doesn't manipulate GUI directly
+			try:
+				self.output_signal.emit('[!] Attempting: systemctl reboot')
+				subprocess.check_call(['systemctl', 'reboot'])
+			except Exception:
 				try:
-					# start in new session so GUI isn't blocked and terminal persists
-					subprocess.Popen(cmd, start_new_session=True)
-					self.log(f"[+] Launched terminal: {cmd[0]}")
-					return
-				except Exception as e:
-					self.log(f"[ERROR] Failed to launch {cmd[0]}: {e}")
-		# Try Windows candidates if on Windows
-		if sys.platform.startswith('win'):
-			for cmd in win_candidates:
-				if shutil.which(cmd[0]):
+					self.output_signal.emit('[!] Fallback: shutdown -r now')
+					subprocess.check_call(['shutdown', '-r', 'now'])
+				except Exception:
 					try:
-						subprocess.Popen(cmd, shell=False)
-						self.log(f"[+] Launched terminal: {cmd[0]}")
-						return
+						self.output_signal.emit('[!] Fallback: reboot')
+						subprocess.check_call(['reboot'])
 					except Exception as e:
-						self.log(f"[ERROR] Failed to launch {cmd[0]}: {e}")
-		# no terminal emulator found
-		QMessageBox.information(self, 'No terminal', 'No terminal emulator found on system. Please install xterm or run a shell via SSH for debugging.')
+						self.output_signal.emit(f'[ERROR] Restart failed: {e}')
+
+		threading.Thread(target=_do_restart, daemon=True).start()
+
+	def open_shell(self):
+		# Open Shell intentionally disabled. Keep a no-op placeholder so
+		# any code that calls this method won't raise; log for visibility.
+		try:
+			self.log('[!] Open Shell disabled')
+		except Exception:
+			pass
 
 	def toggle_maximize(self):
 		"""Toggle between maximized and normal window states (acts like Kali maximize)."""
@@ -2136,6 +2194,16 @@ def main():
 		except Exception:
 			# ignore if attributes not present on this PyQt build
 			pass
+		# Startup ASCII banner (emitted to UI console after window created)
+		STARTUP_BANNER = r"""          
+                        
+    _     _ _______ _______ _     _  _____  _______  _____  _     _ _______ ______ 
+    |_____| |_____| |       |____/  |     | |______ |   __| |     | |_____| |     \
+    |     | |     | |_____  |    \_ |_____| ______| |____\| |_____| |     | |_____/
+                                                                                
+                                         - ATTACK BOX (beta 1.0)            
+																     
+																	 """
 		app = QApplication(sys.argv)
 		# after QApplication is created, print post-app diagnostics
 		try:
@@ -2148,6 +2216,15 @@ def main():
 		raise
 	# (software OpenGL attribute is set earlier, before QApplication creation)
 	w = LabWindow()
+	# Emit startup banner into the application's log console where `output_signal` is handled
+	try:
+		for _ln in STARTUP_BANNER.splitlines():
+			try:
+				w.output_signal.emit(_ln)
+			except Exception:
+				pass
+	except Exception:
+		pass
 	# If requested, enable frameless/topmost/customized flags and force fullscreen.
 	# Otherwise, honor USE_FULL_SCREEN or default to maximized.
 	try:
