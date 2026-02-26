@@ -112,7 +112,8 @@ LABS = {'Linux – Sudo PrivEsc': ('sudo_privesc', 'Gain root via sudo misconfig
  'Red teams': ('net', 'Red team your way through a vulnerable network'),
  'IOT': ('asds', 'deep dive into IOT vulnerabilities'),
  'Cryto': ('sdW', 'Sharpen your crypto skills with rsa, aes, hashing and more'),
- 'Enumertion': ('sd', 'enumerate network services and hosts') }
+ 'Enumertion': ('sd', 'enumerate network services and hosts'),
+ 'testcolor': ('test', 'test color') }
 
 
 # Optional per-lab difficulty mapping (title -> 'Easy'|'Medium'|'Hard')
@@ -127,6 +128,7 @@ LAB_DIFFICULTY = {
 	'IOT': 'Medium',
 	'Cryto': 'Easy',
 	'Enumertion': 'Easy',
+	'testcolor': 'Medium',
 }
 
 # Default scripts (can be overridden by env vars)
@@ -146,8 +148,8 @@ LAB_INSTALLERS = {'asda': 'asd',
  'ab': 'https://github.com/Abu-cmg/lab-files/blob/main/pen.sh',
  'web_sqli': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/lab_web.sh.sh',
  'web_upload': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/upload.sh',
- 'sd': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/upload.sh' }
-
+ 'sd': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/upload.sh', 
+ 'test': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/color1.sh' }
 # Persisted labs config paths: prefer system-wide '/opt/lab/labs.json'
 # but fall back to the local `labs.json` beside this script when not writable.
 _SYSTEM_LABS_DIR = '/opt/lab'
@@ -1343,15 +1345,6 @@ class LabWindow(QMainWindow):
 				if os.name != 'nt':
 					st = os.stat(dest)
 					os.chmod(dest, st.st_mode | stat.S_IEXEC)
-					# Attempt to set ownership to antori:antori when available
-					try:
-						import pwd, grp
-						uid = pwd.getpwnam('antori').pw_uid
-						gid = grp.getgrnam('antori').gr_gid
-						os.chown(dest, uid, gid)
-						self.output_signal.emit('[+] Ownership set to antori:antori')
-					except Exception:
-						pass
 			except Exception as e:
 				self.output_signal.emit(f"[WARN] chmod failed: {e}")
 
@@ -1589,15 +1582,6 @@ class LabWindow(QMainWindow):
 					if os.name != 'nt':
 						st = os.stat(user_dest)
 						os.chmod(user_dest, st.st_mode | stat.S_IEXEC)
-						# Attempt to set ownership to antori:antori when available
-						try:
-							import pwd, grp
-							uid = pwd.getpwnam('antori').pw_uid
-							gid = grp.getgrnam('antori').gr_gid
-							os.chown(user_dest, uid, gid)
-							self.output_signal.emit('[+] Ownership set to antori:antori')
-						except Exception:
-							pass
 				except Exception:
 					pass
 				try:
@@ -1616,15 +1600,6 @@ class LabWindow(QMainWindow):
 								shutil.copy2(user_dest, dest)
 								st = os.stat(dest)
 								os.chmod(dest, st.st_mode | stat.S_IEXEC)
-								# Attempt to set ownership to antori:antori on installed path
-								try:
-									import pwd, grp
-									uid = pwd.getpwnam('antori').pw_uid
-									gid = grp.getgrnam('antori').gr_gid
-									os.chown(dest, uid, gid)
-									self.output_signal.emit('[+] Ownership set to antori:antori')
-								except Exception:
-									pass
 								installed_dest = dest
 								self.output_signal.emit(f"[+] Installed updated script to {dest} (running as root)")
 						except Exception:
@@ -1638,15 +1613,6 @@ class LabWindow(QMainWindow):
 						if r.returncode == 0:
 							# try chmod
 							r2 = subprocess.run(['sudo', '-n', 'chmod', '+x', dest], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-							# attempt to set ownership to antori:antori via sudo
-							try:
-								r3 = subprocess.run(['sudo', '-n', 'chown', 'antori:antori', dest], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-								if r3.returncode == 0:
-									self.output_signal.emit('[+] Ownership set to antori:antori (sudo)')
-								else:
-									self.output_signal.emit(f"[WARN] sudo chown failed: {r3.stderr.decode(errors='ignore')}")
-							except Exception as e:
-								self.output_signal.emit(f"[WARN] sudo chown attempt failed: {e}")
 							installed_dest = dest
 							self.output_signal.emit(f"[+] Installed updated script to {dest} via sudo")
 						else:
