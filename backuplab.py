@@ -110,7 +110,8 @@ LABS = {'Linux – Sudo PrivEsc': ('sudo_privesc', 'Gain root via sudo misconfig
  'dsfsd': ('fsdfd', 'zxcdds'),
  'red teams': ('net', 'check'),
  'sads': ('asds', 'das (Hard)'),
- 'sdk': ('sd', 'sdsd')}
+ 'HELLOO': ('sdW', 'JI'),
+ 'sdk': ('sd', 'sdsd') }
 
 
 # Optional per-lab difficulty mapping (title -> 'Easy'|'Medium'|'Hard')
@@ -132,9 +133,8 @@ LAB_INSTALLERS = {'asda': 'asd',
  'net': 'https://github.com/Abu-cmg/lab-files/blob/main/red.sh',
  'sd': 'sadasd',
  'web_sqli': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/lab_web.sh.sh',
- 'web_upload': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/upload.sh'}
-
-
+ 'web_upload': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/upload.sh',
+ 'sd': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/upload.sh' }
 
 # Persisted labs config paths: prefer system-wide '/opt/lab/labs.json'
 # but fall back to the local `labs.json` beside this script when not writable.
