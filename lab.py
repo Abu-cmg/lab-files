@@ -107,7 +107,7 @@ LABS = {'Linux – Sudo PrivEsc': ('sudo_privesc', 'Gain root via sudo misconfig
  'Web – File Upload': ('web_upload', 'Exploit insecure file upload handling.'),
  'Web – SQL Injection': ('web_sqli', 'Practise SQLi against a vulnerable app.'),
  'Web – XSS': ('web_xss', 'Learn about XSS (Cross-Site Scripting) and how to defend against it.'),
- 'Boot2root': ('ab', 'Get root_admin by exploiting various vulnerabilities in a  Linux environment .'),
+ 'Pentest': ('ab', 'Get root_admin by exploiting various vulnerabilities in a  Linux environment .'),
  'Privelege Escaltion': ('fsdfd', 'try your privelege escalation skills'),
  'Red teams': ('net', 'Red team your way through a vulnerable network'),
  'IOT': ('asds', 'deep dive into IOT vulnerabilities'),
@@ -118,7 +118,7 @@ LABS = {'Linux – Sudo PrivEsc': ('sudo_privesc', 'Gain root via sudo misconfig
 
 # Optional per-lab difficulty mapping (title -> 'Easy'|'Medium'|'Hard')
 LAB_DIFFICULTY = {
-	'Boot2root': 'Hard',
+	'Pentest': 'Hard',
 	'Linux – Sudo PrivEsc': 'Hard',
 	'Web – File Upload': 'Medium',
 	'Web – SQL Injection': 'Easy',
