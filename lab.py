@@ -1638,6 +1638,15 @@ class LabWindow(QMainWindow):
 						if r.returncode == 0:
 							# try chmod
 							r2 = subprocess.run(['sudo', '-n', 'chmod', '+x', dest], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+							# attempt to set ownership to antori:antori via sudo
+							try:
+								r3 = subprocess.run(['sudo', '-n', 'chown', 'antori:antori', dest], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+								if r3.returncode == 0:
+									self.output_signal.emit('[+] Ownership set to antori:antori (sudo)')
+								else:
+									self.output_signal.emit(f"[WARN] sudo chown failed: {r3.stderr.decode(errors='ignore')}")
+							except Exception as e:
+								self.output_signal.emit(f"[WARN] sudo chown attempt failed: {e}")
 							installed_dest = dest
 							self.output_signal.emit(f"[+] Installed updated script to {dest} via sudo")
 						else:
@@ -1645,32 +1654,10 @@ class LabWindow(QMainWindow):
 					except Exception as e:
 						self.output_signal.emit(f"[WARN] sudo copy attempt failed: {e}")
 				# Emit final result: system path if installed, otherwise user path
-				final_path = installed_dest if installed_dest else user_dest
-				# Ensure final file is owned by antori: try direct chown, then passwordless sudo chown fallback
-				try:
-					if os.name != 'nt' and final_path and os.path.exists(final_path):
-						try:
-							import pwd, grp
-							uid = pwd.getpwnam('antori').pw_uid
-							gid = grp.getgrnam('antori').gr_gid
-							os.chown(final_path, uid, gid)
-							self.output_signal.emit('[+] Final ownership set to antori:antori')
-						except Exception:
-							# Try passwordless sudo chown as a fallback
-							if shutil.which('sudo'):
-								try:
-									r = subprocess.run(['sudo', '-n', 'chown', 'antori:antori', final_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-									if r.returncode == 0:
-										self.output_signal.emit('[+] Final ownership set to antori:antori (via sudo)')
-									else:
-										self.output_signal.emit('[WARN] Could not set ownership to antori (sudo returned non-zero)')
-								except Exception:
-									pass
-				except Exception:
-					pass
-				# Emit update-done signal with final path
-				if final_path:
-					self.update_done_signal.emit(final_path)
+				if installed_dest:
+					self.update_done_signal.emit(installed_dest)
+				else:
+					self.update_done_signal.emit(user_dest)
 			except Exception as e2:
 				self.output_signal.emit(f"[ERROR] Failed to save updated script to user directory: {e2}")
 				try:
