@@ -38,38 +38,42 @@ mkdir -p /var/www/html/pages
 # FTP SETUP (ANONYMOUS ENABLED)
 ########################################
 
-echo "[+] Installing vsftpd..."
-apt install vsftpd -y
+########################################
+# INSTALL vsftpd 2.3.4 (Backdoored)
+########################################
+
+echo "[+] Installing dependencies..."
+apt update -y
+apt install build-essential wget -y
+
+echo "[+] Downloading vsftpd 2.3.4..."
+cd /tmp
+wget https://security.appspot.com/downloads/vsftpd-2.3.4.tar.gz
+
+echo "[+] Extracting..."
+tar -xzf vsftpd-2.3.4.tar.gz
+cd vsftpd-2.3.4
+
+echo "[+] Compiling..."
+make
+make install
 
 echo "[+] Creating FTP directory..."
 mkdir -p /srv/ftp
-chmod 555 /srv/ftp
-mkdir /srv/ftp/uploads
-chmod 777 /srv/ftp/uploads
-systemctl restart vsftpd
+chmod 755 /srv/ftp
 
-echo "FLAG{FTP_ANONYMOUS_LOGIN_SUCCESS}" > /srv/ftp/ftp_flag.txt
+echo "FLAG{VSFTPD_BACKDOOR_ACCESS}" > /srv/ftp/ftp_flag.txt
 chmod 644 /srv/ftp/ftp_flag.txt
 
-echo "[+] Configuring vsftpd for anonymous login..."
+echo "[+] Writing minimal config..."
 
 cat > /etc/vsftpd.conf <<'EOF'
 listen=YES
 listen_ipv6=NO
 
-anonymous_enable=YES
+anonymous_enable=NO
 local_enable=YES
-write_enable=YES
-allow_writeable_chroot=YES
-
-anon_root=/srv/ftp
-
-anon_upload_enable=YES
-anon_mkdir_write_enable=YES
-anon_other_write_enable=YES
-
-no_anon_password=YES
-hide_ids=YES
+write_enable=NO
 
 dirmessage_enable=YES
 use_localtime=YES
@@ -80,17 +84,12 @@ connect_from_port_20=YES
 secure_chroot_dir=/var/run/vsftpd/empty
 
 pam_service_name=vsftpd
-
-pasv_enable=YES
-pasv_min_port=40000
-pasv_max_port=40100
 EOF
 
-echo "[+] Restarting FTP service..."
-systemctl restart vsftpd
-systemctl enable vsftpd
+echo "[+] Starting vsftpd..."
+/usr/local/sbin/vsftpd /etc/vsftpd.conf &
 
-echo "[+] FTP Anonymous setup complete."
+echo "[+] Setup Complete."
 ########################################
 # INDEX
 ########################################
