@@ -103,32 +103,15 @@ import time
 import pprint
 
 
-LABS = {'Linux – Sudo PrivEsc': ('sudo_privesc', 'Gain root via sudo misconfiguration.'),
- 'Web – File Upload': ('web_upload', 'Exploit insecure file upload handling.'),
- 'Web – SQL Injection': ('web_sqli', 'Practise SQLi against a vulnerable app.'),
- 'Web – XSS': ('web_xss', 'Learn about XSS (Cross-Site Scripting) and how to defend against it.'),
+LABS = {
  'Exploitation Techniques & Web Attacks': ('ab', 'Get root_admin by exploiting various vulnerabilities in a  Linux environment .'),
- 'Privelege Escaltion': ('fsdfd', 'try your privelege escalation skills'),
- 'Red teams': ('net', 'Red team your way through a vulnerable network'),
- 'IOT': ('asds', 'deep dive into IOT vulnerabilities'),
- 'Cryto': ('sdW', 'Sharpen your crypto skills with rsa, aes, hashing and more'),
- 'Enumertion': ('sd', 'enumerate network services and hosts'),
- 'testcolor': ('test', 'test color') }
+ }
 
 
 # Optional per-lab difficulty mapping (title -> 'Easy'|'Medium'|'Hard')
 LAB_DIFFICULTY = {
 	'Exploitation Techniques & Web Attacks': 'Hard',
-	'Linux – Sudo PrivEsc': 'Hard',
-	'Web – File Upload': 'Medium',
-	'Web – SQL Injection': 'Easy',
-	'Web – XSS': 'Easy',
-	'Privelege Escaltion': 'Medium',
-	'Red teams': 'Hard',
-	'IOT': 'Medium',
-	'Cryto': 'Easy',
-	'Enumertion': 'Easy',
-	'testcolor': 'Medium',
+	
 }
 
 # Default scripts (can be overridden by env vars)
@@ -141,15 +124,9 @@ ROOT_USER = os.environ.get("ROOT_USER", "antori")
 # Per-lab installer sources. Keys are the lab codes from `LABS` values.
 # Values may be a URL to a shell installer (http/https) or None to use
 # the default `INSTALL_SCRIPT` mechanism. Add more entries here.
-LAB_INSTALLERS = {'asda': 'asd',
- 'asds': 'asdsa',
- 'fsdfd': 'sdf',
- 'net': 'https://github.com/Abu-cmg/lab-files/blob/main/red.sh',
+LAB_INSTALLERS = {
  'ab': 'https://github.com/Abu-cmg/lab-files/blob/main/pen.sh',
- 'web_sqli': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/lab_web.sh.sh',
- 'web_upload': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/upload.sh',
- 'sd': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/upload.sh', 
- 'test': 'https://raw.githubusercontent.com/Abu-cmg/lab-files/main/color1.sh' }
+  }
 # Persisted labs config paths: prefer system-wide '/opt/lab/labs.json'
 # but fall back to the local `labs.json` beside this script when not writable.
 _SYSTEM_LABS_DIR = '/opt/lab'
@@ -794,7 +771,7 @@ class LabWindow(QMainWindow):
 
 		# Add an app title under the banner
 		try:
-			title_lbl = QLabel("HKQ's Practice Labs")
+			title_lbl = QLabel("HackObox")
 			title_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
 			title_lbl.setStyleSheet('color:#9370db; font-size:18px; font-weight:800; padding:6px 0;')
 			wrapper.addWidget(title_lbl)
@@ -2228,7 +2205,7 @@ def main():
     |_____| |_____| |       |____/  |     | |______ |   __| |     | |_____| |     \
     |     | |     | |_____  |    \_ |_____| ______| |____\| |_____| |     | |_____/
                                                                                 
-                                         - ATTACK BOX (beta 1.0)            
+                                         - HackObox(beta 1.0)            
 																     
 																	 """
 		app = QApplication(sys.argv)
