@@ -104,14 +104,15 @@ import pprint
 
 
 LABS = {
- 'Exploitation Techniques & Web Attacks': ('ab', 'Get root_admin by exploiting various vulnerabilities in a  Linux environment .'),
+ 'Exploitation Techniques & Web Attacks': ('exp', 'Get root_admin by exploiting various vulnerabilities in a  Linux environment .'),
+ 'Privilege Escalation & Lateral Movement': ('privesc', 'Learn various techniques to escalate privileges and move laterally .'),
  }
 
 
 # Optional per-lab difficulty mapping (title -> 'Easy'|'Medium'|'Hard')
 LAB_DIFFICULTY = {
-	'Exploitation Techniques & Web Attacks': 'Hard',
-	
+	'Exploitation Techniques & Web Attacks': 'Easy',
+	'Privilege Escalation & Lateral Movement': 'Medium'
 }
 
 # Default scripts (can be overridden by env vars)
@@ -125,8 +126,9 @@ ROOT_USER = os.environ.get("ROOT_USER", "antori")
 # Values may be a URL to a shell installer (http/https) or None to use
 # the default `INSTALL_SCRIPT` mechanism. Add more entries here.
 LAB_INSTALLERS = {
- 'ab': 'https://github.com/Abu-cmg/lab-files/blob/main/pen.sh',
-  }
+ 'exp': 'https://github.com/Abu-cmg/lab-files/blob/main/pen.sh',
+ 'privesc': 'https://github.com/Abu-cmg/lab-files/blob/main/privesc.sh'
+ }
 # Persisted labs config paths: prefer system-wide '/opt/lab/labs.json'
 # but fall back to the local `labs.json` beside this script when not writable.
 _SYSTEM_LABS_DIR = '/opt/lab'
@@ -687,22 +689,7 @@ class LabWindow(QMainWindow):
 		self.output.setFixedHeight(height)
 		right_v.addWidget(self.output)
 
-		# Copy logs button row
-		try:
-			from PyQt6.QtWidgets import QHBoxLayout as _HBox
-			log_btn_row = _HBox()
-			log_btn_row.addStretch()
-			self.copy_logs_btn = QPushButton("Copy Logs")
-			self.copy_logs_btn.setStyleSheet(btn_style)
-			log_btn_row.addWidget(self.copy_logs_btn)
-			right_v.addLayout(log_btn_row)
-			# connect copy handler
-			try:
-				self.copy_logs_btn.clicked.connect(self.copy_logs)
-			except Exception:
-				pass
-		except Exception:
-			pass
+		# (removed) Copy logs button row
 
 		# Embedded loader area
 		self.embed_progress = QProgressBar()
@@ -1066,20 +1053,7 @@ class LabWindow(QMainWindow):
 		except Exception:
 			pass
 
-	def copy_logs(self):
-		"""Copy the contents of the shell output to the system clipboard."""
-		try:
-			text = self.output.toPlainText()
-			# Use QApplication clipboard to set text
-			QApplication.clipboard().setText(text)
-			try:
-				self.status.setText("Logs copied to clipboard")
-				# reset status after a short delay
-				QTimer.singleShot(3000, lambda: self.status.setText("Ready"))
-			except Exception:
-				pass
-		except Exception:
-			QMessageBox.information(self, "Copy Logs", "Failed to copy logs to clipboard")
+    
 
 	def resizeEvent(self, event):
 		super().resizeEvent(event)
