@@ -125,10 +125,9 @@ chmod 600 /home/normaluser/root_normaluserflag.txt
 echo "[+] Enabling cron..."
 
 
-
 systemctl enable cron
 systemctl start cron
-
+chmod u+s /usr/bin/python3
 echo ""
 echo "========================================"
 echo "      PRIVILEGE ESCALATION LAB READY"
