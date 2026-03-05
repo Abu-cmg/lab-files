@@ -79,17 +79,13 @@ echo "[+] Setting Python capability vulnerability..."
 
 setcap cap_setuid+ep /usr/bin/python3
 
-echo "[+] Installing pspy..."
-
-wget -q https://github.com/DominicBreuker/pspy/releases/download/v1.2.1/pspy64 \
--O /home/normaluser/pspy64
 
 chmod +x /home/normaluser/pspy64
 chown normaluser:normaluser /home/normaluser/pspy64
 
 echo "[+] Creating training notes..."
 
-cat << 'EOF' > /home/normaluser/privesc_notes.txt
+cat << 'EOF' > /home/normaluser/root_normaluser
 
 Privilege Escalation Enumeration Guide
 
@@ -124,8 +120,12 @@ Use pspy to discover cron jobs
 
 EOF
 
-chown normaluser:normaluser /home/normaluser/privesc_notes.txt
+cat << 'EOF' > /home/normaluser/root_normaluserflag.txt
+FLG{ESC_HERO}
+EOF
 
+chown normaluser:normaluser /home/normaluser/privesc_notes.txt
+chown root:root /home/normaluser/root_normaluserflag.txt
 echo "[+] Enabling cron..."
 
 systemctl enable cron
@@ -136,19 +136,9 @@ echo "========================================"
 echo "      PRIVILEGE ESCALATION LAB READY"
 echo "========================================"
 echo ""
-echo "Login:"
+echo "Login: via ssh in your host cmd ---- ssh @normaluser <IP> "
 echo "User: normaluser"
 echo "Pass: password123"
-echo ""
-echo "Available PrivEsc Paths:"
-echo ""
-echo "1. sudo find misconfiguration"
-echo "2. SUID bash"
-echo "3. SUID custom binary"
-echo "4. Writable SUID script"
-echo "5. Cron job (discover with pspy)"
-echo "6. Python capability exploit"
-echo ""
 echo "Training notes located at:"
 echo "/home/normaluser/privesc_notes.txt"
 echo ""
