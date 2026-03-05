@@ -687,6 +687,23 @@ class LabWindow(QMainWindow):
 		self.output.setFixedHeight(height)
 		right_v.addWidget(self.output)
 
+		# Copy logs button row
+		try:
+			from PyQt6.QtWidgets import QHBoxLayout as _HBox
+			log_btn_row = _HBox()
+			log_btn_row.addStretch()
+			self.copy_logs_btn = QPushButton("Copy Logs")
+			self.copy_logs_btn.setStyleSheet(btn_style)
+			log_btn_row.addWidget(self.copy_logs_btn)
+			right_v.addLayout(log_btn_row)
+			# connect copy handler
+			try:
+				self.copy_logs_btn.clicked.connect(self.copy_logs)
+			except Exception:
+				pass
+		except Exception:
+			pass
+
 		# Embedded loader area
 		self.embed_progress = QProgressBar()
 		self.embed_progress.setValue(0)
@@ -1048,6 +1065,21 @@ class LabWindow(QMainWindow):
 			self.status.setText(str(msg))
 		except Exception:
 			pass
+
+	def copy_logs(self):
+		"""Copy the contents of the shell output to the system clipboard."""
+		try:
+			text = self.output.toPlainText()
+			# Use QApplication clipboard to set text
+			QApplication.clipboard().setText(text)
+			try:
+				self.status.setText("Logs copied to clipboard")
+				# reset status after a short delay
+				QTimer.singleShot(3000, lambda: self.status.setText("Ready"))
+			except Exception:
+				pass
+		except Exception:
+			QMessageBox.information(self, "Copy Logs", "Failed to copy logs to clipboard")
 
 	def resizeEvent(self, event):
 		super().resizeEvent(event)
@@ -2205,7 +2237,7 @@ def main():
     |_____| |_____| |       |____/  |     | |______ |   __| |     | |_____| |     \
     |     | |     | |_____  |    \_ |_____| ______| |____\| |_____| |     | |_____/
                                                                                 
-                                         - HackObox(beta 1.0)            
+                                         - ATTACK BOX (beta 1.0)            
 																     
 																	 """
 		app = QApplication(sys.argv)
