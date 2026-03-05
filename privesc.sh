@@ -75,13 +75,6 @@ chmod +x /opt/backup/backup.sh
 
 echo "* * * * * root /opt/backup/backup.sh" >> /etc/crontab
 
-echo "[+] Setting Python capability vulnerability..."
-
-setcap cap_setuid+ep /usr/bin/python3
-
-
-chmod +x /home/normaluser/pspy64
-chown normaluser:normaluser /home/normaluser/pspy64
 
 echo "[+] Creating training notes..."
 
@@ -126,7 +119,12 @@ EOF
 
 chown normaluser:normaluser /home/normaluser/privesc_notes.txt
 chown root:root /home/normaluser/root_normaluserflag.txt
+
+chmod 600 /home/normaluser/root_normaluserflag.txt
+
 echo "[+] Enabling cron..."
+
+
 
 systemctl enable cron
 systemctl start cron
