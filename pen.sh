@@ -38,13 +38,8 @@ mkdir -p /var/www/html/pages
 # FTP SETUP (ANONYMOUS ENABLED)
 ########################################
 
-########################################
-# INSTALL vsftpd 2.3.4 (Backdoored)
-########################################
-
 echo "[+] Installing dependencies..."
-apt update -y
-apt install build-essential wget -y
+apt install -y build-essential wget libxcrypt-dev libssl-dev
 
 echo "[+] Downloading vsftpd 2.3.4..."
 cd /tmp
@@ -54,20 +49,24 @@ echo "[+] Extracting..."
 tar -xzf vsftpd-2.3.4.tar.gz
 cd vsftpd-2.3.4
 
-echo "[+] Compiling..."
+echo "[+] Fixing crypt linking issue..."
+sed -i 's/^LIBS.*/LIBS = -lcrypt/' Makefile
+
+echo "[+] Compiling vsftpd..."
+make clean
 make
 make install
 
-echo "[+] Creating FTP directory..."
+echo "[+] Creating FTP directories..."
 mkdir -p /srv/ftp
 chmod 755 /srv/ftp
 
 echo "FLAG{VSFTPD_BACKDOOR_ACCESS}" > /srv/ftp/ftp_flag.txt
 chmod 644 /srv/ftp/ftp_flag.txt
 
-echo "[+] Writing minimal config..."
+echo "[+] Creating vsftpd config..."
 
-cat > /etc/vsftpd.conf <<'EOF'
+cat > /etc/vsftpd.conf <<EOF
 listen=YES
 listen_ipv6=NO
 
@@ -82,14 +81,17 @@ xferlog_enable=YES
 connect_from_port_20=YES
 
 secure_chroot_dir=/var/run/vsftpd/empty
-
 pam_service_name=vsftpd
+
+ftpd_banner=vsFTPd 2.3.4 Vulnerable Server
 EOF
 
 echo "[+] Starting vsftpd..."
 /usr/local/sbin/vsftpd /etc/vsftpd.conf &
 
-echo "[+] Setup Complete."
+echo "[+] Setup Complete!"
+echo "Target now running vsftpd 2.3.4"
+echo "Flag location: /srv/ftp/ftp_flag.txt"
 ########################################
 # INDEX
 ########################################
