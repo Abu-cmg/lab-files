@@ -38,54 +38,38 @@ mkdir -p /var/www/html/pages
 # FTP SETUP (ANONYMOUS ENABLED)
 ########################################
 
-#!/bin/bash
+echo "[+] Installing vsftpd..."
+apt install vsftpd -y
 
-echo "[+] Updating system..."
-apt update -y
-
-echo "[+] Stopping any existing FTP servers..."
-systemctl stop vsftpd 2>/dev/null
-systemctl disable vsftpd 2>/dev/null
-pkill vsftpd 2>/dev/null
-
-echo "[+] Installing dependencies..."
-apt install -y build-essential wget libxcrypt-dev libssl-dev net-tools
-
-echo "[+] Downloading vsftpd 2.3.4..."
-cd /tmp
-rm -rf vsftpd-2.3.4
-wget https://security.appspot.com/downloads/vsftpd-2.3.4.tar.gz
-
-echo "[+] Extracting..."
-tar -xzf vsftpd-2.3.4.tar.gz
-cd vsftpd-2.3.4
-
-echo "[+] Fixing crypt linking issue..."
-sed -i 's/^LIBS.*/LIBS = -lcrypt/' Makefile
-
-echo "[+] Compiling vsftpd..."
-make clean
-make
-
-echo "[+] Installing vsftpd binary..."
-install -m 755 vsftpd /usr/local/sbin/vsftpd
-
-echo "[+] Creating FTP directories..."
+echo "[+] Creating FTP directory..."
 mkdir -p /srv/ftp
-chmod 755 /srv/ftp
+chmod 555 /srv/ftp
+mkdir /srv/ftp/uploads
+chmod 777 /srv/ftp/uploads
+systemctl restart vsftpd
 
-echo "FLAG{VSFTPD_BACKDOOR_ACCESS}" > /srv/ftp/ftp_flag.txt
+echo "FLAG{FTP_ANONYMOUS_LOGIN_SUCCESS}" > /srv/ftp/ftp_flag.txt
 chmod 644 /srv/ftp/ftp_flag.txt
 
-echo "[+] Creating vsftpd config..."
+echo "[+] Configuring vsftpd for anonymous login..."
 
-cat > /etc/vsftpd.conf <<EOF
+cat > /etc/vsftpd.conf <<'EOF'
 listen=YES
 listen_ipv6=NO
 
-anonymous_enable=NO
+anonymous_enable=YES
 local_enable=YES
-write_enable=NO
+write_enable=YES
+allow_writeable_chroot=YES
+
+anon_root=/srv/ftp
+
+anon_upload_enable=YES
+anon_mkdir_write_enable=YES
+anon_other_write_enable=YES
+
+no_anon_password=YES
+hide_ids=YES
 
 dirmessage_enable=YES
 use_localtime=YES
@@ -94,23 +78,19 @@ xferlog_enable=YES
 connect_from_port_20=YES
 
 secure_chroot_dir=/var/run/vsftpd/empty
+
 pam_service_name=vsftpd
 
-ftpd_banner=vsFTPd 2.3.4 Vulnerable Server
+pasv_enable=YES
+pasv_min_port=40000
+pasv_max_port=40100
 EOF
 
-echo "[+] Starting vsftpd..."
-/usr/local/sbin/vsftpd /etc/vsftpd.conf &
+echo "[+] Restarting FTP service..."
+systemctl restart vsftpd
+systemctl enable vsftpd
 
-sleep 2
-
-echo "[+] Checking FTP service..."
-ss -tulpn | grep :21
-
-echo ""
-echo "[+] Setup Complete!"
-echo "Target running: vsftpd 2.3.4"
-echo "Flag location: /srv/ftp/ftp_flag.txt"
+echo "[+] FTP Anonymous setup complete."
 ########################################
 # INDEX
 ########################################
@@ -290,11 +270,16 @@ footer {
 EOF
 
 ########################################
+# PRIVILEGE ESCALATION (FAKE ROOT VIA FIND)
 # PRIVILEGE ESCALATION 
 ########################################
 
+echo "[+] Creating fake root-style user..."
+
 useradd -m -s /bin/bash root_admin
 echo "root_admin:RootAdmin@123" | chpasswd
+
+echo "[+] Creating fake root flag..."
 echo "FLAG{ESCALATED_TO_FAKE_ROOT}" > /home/root_admin/root.txt
 chown root_admin:root_admin /home/root_admin/root.txt
 chmod 600 /home/root_admin/root.txt
@@ -310,6 +295,8 @@ chown root_admin:root_admin /usr/local/bin/find
 # Set SUID bit
 chmod 4755 /usr/local/bin/find
 
+echo "[+] Fake-root SUID find created at /usr/local/bin/find"
+
 
 ########################################
 # PERMISSIONS
@@ -319,14 +306,13 @@ chmod -R 755 /var/www/html
 
 systemctl restart apache2
 
+echo ""
 #!/bin/bash
 
 RED="\e[31m"
 RESET="\e[0m"
 
-echo -e "${RED}"
-echo "======================================"
-echo " LAB READY"
-echo " Target: http://SERVER-IP/"
+
+echo " developer can run find as root"
 echo "======================================"
 echo -e "${RESET}"
