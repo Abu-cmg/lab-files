@@ -38,11 +38,22 @@ mkdir -p /var/www/html/pages
 # FTP SETUP (ANONYMOUS ENABLED)
 ########################################
 
+#!/bin/bash
+
+echo "[+] Updating system..."
+apt update -y
+
+echo "[+] Stopping any existing FTP servers..."
+systemctl stop vsftpd 2>/dev/null
+systemctl disable vsftpd 2>/dev/null
+pkill vsftpd 2>/dev/null
+
 echo "[+] Installing dependencies..."
-apt install -y build-essential wget libxcrypt-dev libssl-dev
+apt install -y build-essential wget libxcrypt-dev libssl-dev net-tools
 
 echo "[+] Downloading vsftpd 2.3.4..."
 cd /tmp
+rm -rf vsftpd-2.3.4
 wget https://security.appspot.com/downloads/vsftpd-2.3.4.tar.gz
 
 echo "[+] Extracting..."
@@ -55,7 +66,9 @@ sed -i 's/^LIBS.*/LIBS = -lcrypt/' Makefile
 echo "[+] Compiling vsftpd..."
 make clean
 make
-make install
+
+echo "[+] Installing vsftpd binary..."
+install -m 755 vsftpd /usr/local/sbin/vsftpd
 
 echo "[+] Creating FTP directories..."
 mkdir -p /srv/ftp
@@ -89,8 +102,14 @@ EOF
 echo "[+] Starting vsftpd..."
 /usr/local/sbin/vsftpd /etc/vsftpd.conf &
 
+sleep 2
+
+echo "[+] Checking FTP service..."
+ss -tulpn | grep :21
+
+echo ""
 echo "[+] Setup Complete!"
-echo "Target now running vsftpd 2.3.4"
+echo "Target running: vsftpd 2.3.4"
 echo "Flag location: /srv/ftp/ftp_flag.txt"
 ########################################
 # INDEX
