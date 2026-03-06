@@ -49,8 +49,6 @@ systemctl restart vsftpd
 echo "FLAG{FTP_ANONYMOUS_LOGIN_SUCCESS}" > /srv/ftp/ftp_flag.txt
 chmod 644 /srv/ftp/ftp_flag.txt
 
-echo "[+] Configuring vsftpd for anonymous login..."
-
 cat > /etc/vsftpd.conf <<'EOF'
 listen=YES
 listen_ipv6=NO
@@ -88,7 +86,6 @@ echo "[+] Restarting FTP service..."
 systemctl restart vsftpd
 systemctl enable vsftpd
 
-echo "[+] FTP Anonymous setup complete."
 ########################################
 # INDEX
 ########################################
@@ -293,7 +290,6 @@ echo "[+] Creating custom SUID find binary..."
 # Set SUID bit
 chmod 4755 /usr/bin/find
 
-echo "[+] Fake-root SUID find created at /usr/local/bin/find"
 
 
 ########################################
@@ -308,9 +304,8 @@ systemctl restart apache2
 RED="\e[31m"
 RESET="\e[0m"
 
-echo "========================================"
+echo -e "${RED}========================================"
 echo "        LAB READY"
 echo "========================================"
 echo "Scan the target ip via nmap"
-echo "======================================"
-echo -e "${RESET}"
+echo "======================================${RESET}"
