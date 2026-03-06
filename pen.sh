@@ -293,7 +293,6 @@ systemctl restart apache2
 ########################################
 
 echo "[+] Installing Samba..."
-apt install samba -y
 
 echo "[+] Creating SMB share directory..."
 mkdir -p /srv/smb/testshare
@@ -318,6 +317,7 @@ cat >> /etc/samba/smb.conf <<'EOF'
 EOF
 
 echo "[+] Restarting SMB service..."
+systemctl unmask smbd
 systemctl restart smbd
 systemctl enable smbd
 
