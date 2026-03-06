@@ -1,7 +1,7 @@
 #!/bin/bash
 
 echo "[+] Updating system..."
-apt update -y
+
 
 echo "[+] Installing packages..."
 apt install -y sudo cron wget gcc python3 libcap2-bin vim
