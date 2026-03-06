@@ -321,11 +321,13 @@ systemctl unmask smbd
 systemctl restart smbd
 systemctl enable smbd
 
-RED="\e[31m"
+YELLOW="\e[33m"
 RESET="\e[0m"
 
-echo -e "${RED}========================================"
-echo "        LAB READY"
-echo "========================================"
-echo "Scan the target ip via nmap"
-echo "======================================${RESET}"
+echo -e "${YELLOW}
+========================================
+        LAB READY
+========================================
+Scan the target ip via nmap
+========================================
+${RESET}"
