@@ -1,4 +1,3 @@
-
 import os
 import sys
 import threading
@@ -584,6 +583,7 @@ class LabWindow(QMainWindow):
 		self.reset_btn = QPushButton("Reset / Cleanup")
 		self.cancel_btn = QPushButton("Cancel")
 		self.restart_btn = QPushButton("Restart System")
+		self.shutdown_btn = QPushButton("Shut Down System")
 		self.shell_btn = QPushButton("Open Shell")
 		# Manage Labs button -- optional interface to add/edit lab cards at runtime
 		# This whole section is easily comment-able. To disable at runtime set
@@ -605,6 +605,8 @@ class LabWindow(QMainWindow):
 		left.addWidget(self.cancel_btn)
 		# Restart button placed below Cancel
 		left.addWidget(self.restart_btn)
+		# Shutdown button placed near Restart
+		left.addWidget(self.shutdown_btn)
 		left.addWidget(self.shell_btn)
 		left.addStretch()
 
@@ -642,10 +644,25 @@ class LabWindow(QMainWindow):
 			"QPushButton:hover{border:1px solid #ffb3b3;}"
 			"QPushButton:disabled{background:#8a2b2b; color:#6a6a6a;}"
 		)
+		# Shutdown button uses same cautionary styling
+		try:
+			self.shutdown_btn.setStyleSheet(
+				"QPushButton{background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #ff4d4f, stop:1 #c40000);"
+				" color:#ffffff; border:1px solid rgba(255,255,255,0.04); border-radius:8px; padding:8px 12px;}"
+				"QPushButton:hover{border:1px solid #ffb3b3;}"
+				"QPushButton:disabled{background:#8a2b2b; color:#6a6a6a;}"
+			)
+		except Exception:
+			pass
 		self.shell_btn.setStyleSheet(btn_style)
 		# connect restart handler
 		try:
 			self.restart_btn.clicked.connect(self.restart_system)
+		except Exception:
+			pass
+		# connect shutdown handler
+		try:
+			self.shutdown_btn.clicked.connect(self.shutdown_system)
 		except Exception:
 			pass
 
@@ -1845,23 +1862,161 @@ class LabWindow(QMainWindow):
 			return
 		self.log('[!] Initiating system restart...')
 
-		def _do_restart():
-			# Use output_signal so background thread doesn't manipulate GUI directly
+		def _restart_workflow():
+			# Perform reset/cleanup first using passwordless sudo (no interactive prompts).
+			self.output_signal.emit('[!] Performing reset/cleanup before restart')
+			opt_reset = '/opt/lab/reset.sh'
+			script_to_run = opt_reset if os.path.exists(opt_reset) else RESET_SCRIPT
+			if not script_to_run or not os.path.exists(script_to_run):
+				self.output_signal.emit(f'[WARN] Reset script not found: {script_to_run}')
+				QMessageBox.information(self, 'Reset missing', f'Reset script not found: {script_to_run}\nAborting restart.')
+				return
+			# ensure executable
+			try:
+				st = os.stat(script_to_run)
+				os.chmod(script_to_run, st.st_mode | stat.S_IEXEC)
+			except Exception:
+				pass
+			# Determine how to run: prefer root or passwordless sudo. Do NOT prompt.
+			try:
+				is_root = False
+				try:
+					is_root = (os.name != 'nt' and os.geteuid() == 0)
+				except Exception:
+					is_root = False
+				if is_root:
+					self.output_signal.emit('[+] Running reset as root')
+					subprocess.run(['/bin/bash', script_to_run])
+				else:
+					# Require passwordless sudo
+					if not shutil.which('sudo'):
+						self.output_signal.emit('[ERROR] sudo not available; cannot run reset non-interactively')
+						QMessageBox.information(self, 'Cannot restart', 'Passwordless sudo is required to perform reset and restart. Aborting.')
+						return
+					r = subprocess.run(['sudo', '-n', 'true'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+					if r.returncode != 0:
+						self.output_signal.emit('[ERROR] passwordless sudo not configured for this user; aborting restart')
+						QMessageBox.information(self, 'Cannot restart', 'Passwordless sudo is required to perform reset and restart. Aborting.')
+						return
+					# Run reset via sudo (blocking)
+					self.output_signal.emit('[+] Running reset via passwordless sudo')
+					subprocess.run(['sudo', '/bin/bash', script_to_run])
+			except Exception as e:
+				self.output_signal.emit(f'[ERROR] Failed to execute reset: {e}')
+
+			# After reset finished (blocking), proceed to reboot using passwordless sudo/root
 			try:
 				self.output_signal.emit('[!] Attempting: systemctl reboot')
-				subprocess.check_call(['systemctl', 'reboot'])
+				if os.name != 'nt' and (is_root or (shutil.which('sudo') and subprocess.run(['sudo', '-n', 'true'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0)):
+					# use sudo if not root, else direct
+					if not is_root:
+						subprocess.check_call(['sudo', 'systemctl', 'reboot'])
+					else:
+						subprocess.check_call(['systemctl', 'reboot'])
 			except Exception:
 				try:
 					self.output_signal.emit('[!] Fallback: shutdown -r now')
-					subprocess.check_call(['shutdown', '-r', 'now'])
+					if not is_root:
+						subprocess.check_call(['sudo', 'shutdown', '-r', 'now'])
+					else:
+						subprocess.check_call(['shutdown', '-r', 'now'])
 				except Exception:
 					try:
 						self.output_signal.emit('[!] Fallback: reboot')
-						subprocess.check_call(['reboot'])
+						if not is_root:
+							subprocess.check_call(['sudo', 'reboot'])
+						else:
+							subprocess.check_call(['reboot'])
 					except Exception as e:
 						self.output_signal.emit(f'[ERROR] Restart failed: {e}')
 
-		threading.Thread(target=_do_restart, daemon=True).start()
+		threading.Thread(target=_restart_workflow, daemon=True).start()
+
+		threading.Thread(target=_restart_workflow, daemon=True).start()
+
+	def shutdown_system(self):
+		"""Prompt and attempt to shut down the host (Linux).
+		Performs reset/cleanup first (same as restart) then powers off.
+		"""
+		# Confirm with user
+		try:
+			resp = QMessageBox.question(self, 'Confirm Shut Down', 'Shut down the system now? This will power off the host.', QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+		except Exception:
+			return
+		if resp != QMessageBox.StandardButton.Yes:
+			return
+		# Only attempt on Linux
+		if not sys.platform.startswith('linux'):
+			QMessageBox.warning(self, 'Unsupported', 'Shut down is supported only on Linux (Debian).')
+			return
+		self.log('[!] Initiating system shutdown...')
+
+		def _shutdown_workflow():
+			# Perform reset/cleanup first using passwordless sudo (no interactive prompts).
+			self.output_signal.emit('[!] Performing reset/cleanup before shutdown')
+			opt_reset = '/opt/lab/reset.sh'
+			script_to_run = opt_reset if os.path.exists(opt_reset) else RESET_SCRIPT
+			if not script_to_run or not os.path.exists(script_to_run):
+				self.output_signal.emit(f'[WARN] Reset script not found: {script_to_run}')
+				QMessageBox.information(self, 'Reset missing', f'Reset script not found: {script_to_run}\nAborting shutdown.')
+				return
+			# ensure executable
+			try:
+				st = os.stat(script_to_run)
+				os.chmod(script_to_run, st.st_mode | stat.S_IEXEC)
+			except Exception:
+				pass
+			# Determine how to run: prefer root or passwordless sudo. Do NOT prompt.
+			try:
+				is_root = False
+				try:
+					is_root = (os.name != 'nt' and os.geteuid() == 0)
+				except Exception:
+					is_root = False
+				if is_root:
+					self.output_signal.emit('[+] Running reset as root')
+					subprocess.run(['/bin/bash', script_to_run])
+				else:
+					if not shutil.which('sudo'):
+						self.output_signal.emit('[ERROR] sudo not available; cannot run reset non-interactively')
+						QMessageBox.information(self, 'Cannot shutdown', 'Passwordless sudo is required to perform reset and shutdown. Aborting.')
+						return
+					r = subprocess.run(['sudo', '-n', 'true'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+					if r.returncode != 0:
+						self.output_signal.emit('[ERROR] passwordless sudo not configured for this user; aborting shutdown')
+						QMessageBox.information(self, 'Cannot shutdown', 'Passwordless sudo is required to perform reset and shutdown. Aborting.')
+						return
+					self.output_signal.emit('[+] Running reset via passwordless sudo')
+					subprocess.run(['sudo', '/bin/bash', script_to_run])
+			except Exception as e:
+				self.output_signal.emit(f'[ERROR] Failed to execute reset: {e}')
+
+			# After reset finished (blocking), proceed to poweroff using passwordless sudo/root
+			try:
+				self.output_signal.emit('[!] Attempting: systemctl poweroff')
+				if os.name != 'nt' and (is_root or (shutil.which('sudo') and subprocess.run(['sudo', '-n', 'true'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0)):
+					if not is_root:
+						subprocess.check_call(['sudo', 'systemctl', 'poweroff'])
+					else:
+						subprocess.check_call(['systemctl', 'poweroff'])
+			except Exception:
+				try:
+					self.output_signal.emit('[!] Fallback: shutdown -h now')
+					if not is_root:
+						subprocess.check_call(['sudo', 'shutdown', '-h', 'now'])
+					else:
+						subprocess.check_call(['shutdown', '-h', 'now'])
+				except Exception:
+					try:
+						self.output_signal.emit('[!] Fallback: poweroff')
+						if not is_root:
+							subprocess.check_call(['sudo', 'poweroff'])
+						else:
+							subprocess.check_call(['poweroff'])
+					except Exception as e:
+						self.output_signal.emit(f'[ERROR] Shutdown failed: {e}')
+
+		threading.Thread(target=_shutdown_workflow, daemon=True).start()
 
 	def open_shell(self):
 		# Open Shell intentionally disabled. Keep a no-op placeholder so
