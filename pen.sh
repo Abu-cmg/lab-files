@@ -265,31 +265,19 @@ footer {
 EOF
 
 ########################################
-# PRIVILEGE ESCALATION (FAKE ROOT VIA FIND)
-# PRIVILEGE ESCALATION 
+# PRIVILEGE ESCALATION (SUID FIND)
 ########################################
 
-echo "[+] Creating fake root-style user..."
+echo "[+] Creating root flag..."
 
-useradd -m -s /bin/bash root_admin
-echo "root_admin:RootAdmin@123" | chpasswd
+echo "FLAG{FIND_SUID_ROOT_ESCALATION}" > /root/root.txt
+chmod 600 /root/root.txt
 
-echo "[+] Creating fake root flag..."
-echo "FLAG{ESCALATED_TO_FAKE_ROOT}" > /home/root_admin/root.txt
-chown root_admin:root_admin /home/root_admin/root.txt
-chmod 600 /home/root_admin/root.txt
+echo "[+] Setting SUID on find..."
 
-echo "[+] Creating custom SUID find binary..."
+chmod u+s /usr/bin/find
 
-# Copy real find
-#cp /usr/bin/find /usr/local/bin/find
-
-# Change ownership to fake root user
-#chown root_admin:root_admin /usr/local/bin/find
-
-# Set SUID bit
-chmod 4755 /usr/bin/find
-
+echo "[✓] Privilege escalation vector ready!"
 
 
 ########################################
