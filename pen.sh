@@ -324,10 +324,8 @@ systemctl enable smbd
 YELLOW="\e[33m"
 RESET="\e[0m"
 
-echo -e "${YELLOW}
-========================================
-        LAB READY
-========================================
-Scan the target ip via nmap
-========================================
-${RESET}"
+echo -e "${YELLOW}========================================${RESET}"
+echo -e "${YELLOW}            LAB READY${RESET}"
+echo -e "${YELLOW}========================================${RESET}"
+echo -e "${YELLOW}       Scan the target IP via nmap${RESET}"
+echo -e "${YELLOW}========================================${RESET}"
