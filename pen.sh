@@ -288,6 +288,38 @@ chmod -R 755 /var/www/html
 
 systemctl restart apache2
 
+########################################
+# SMB SETUP (PASSWORDLESS SHARE)
+########################################
+
+echo "[+] Installing Samba..."
+apt install samba -y
+
+echo "[+] Creating SMB share directory..."
+mkdir -p /srv/smb/testshare
+chmod 777 /srv/smb/testshare
+
+echo "[+] Adding SMB flag..."
+echo "FLAG{SMB_TESTSHARE_ACCESS}" > /srv/smb/testshare/flag.txt
+chmod 644 /srv/smb/testshare/flag.txt
+
+echo "[+] Configuring Samba share..."
+
+cat >> /etc/samba/smb.conf <<'EOF'
+
+[testshare]
+   comment = Test Share Folder
+   path = /srv/smb/testshare
+   browseable = yes
+   read only = no
+   guest ok = yes
+   guest only = yes
+   force user = nobody
+EOF
+
+echo "[+] Restarting SMB service..."
+systemctl restart smbd
+systemctl enable smbd
 
 RED="\e[31m"
 RESET="\e[0m"
