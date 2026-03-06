@@ -4,7 +4,7 @@ echo "[+] Updating system..."
 
 
 echo "[+] Installing packages..."
-apt install -y sudo cron wget gcc python3 libcap2-bin vim
+
 
 echo "[+] Creating lab user..."
 
