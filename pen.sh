@@ -1,10 +1,8 @@
 #!/bin/bash
 
 echo "[+] Updating system..."
-apt update -y
-
 echo "[+] Installing Apache, PHP, SSH..."
-apt install apache2 php libapache2-mod-php openssh-server sudo -y
+#apt install apache2 php libapache2-mod-php openssh-server sudo -y
 
 systemctl unmask apache2
 systemctl enable apache2
