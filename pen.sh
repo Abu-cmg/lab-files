@@ -285,13 +285,13 @@ chmod 600 /home/root_admin/root.txt
 echo "[+] Creating custom SUID find binary..."
 
 # Copy real find
-cp /usr/bin/find /usr/local/bin/find
+#cp /usr/bin/find /usr/local/bin/find
 
 # Change ownership to fake root user
-chown root_admin:root_admin /usr/local/bin/find
+#chown root_admin:root_admin /usr/local/bin/find
 
 # Set SUID bit
-chmod 4755 /usr/local/bin/find
+chmod 4755 /usr/bin/find
 
 echo "[+] Fake-root SUID find created at /usr/local/bin/find"
 
@@ -304,13 +304,13 @@ chmod -R 755 /var/www/html
 
 systemctl restart apache2
 
-echo ""
-#!/bin/bash
 
 RED="\e[31m"
 RESET="\e[0m"
 
-
-echo " developer can run find as root"
+echo "========================================"
+echo "        LAB READY"
+echo "========================================"
+echo "Scan the target ip via nmap"
 echo "======================================"
 echo -e "${RESET}"
