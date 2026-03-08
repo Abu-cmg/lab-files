@@ -1,5 +1,5 @@
 #!/bin/bash
-
+set +e
 echo "[+] Updating system..."
 echo "[+] Installing Apache, PHP, SSH..."
 #apt install apache2 php libapache2-mod-php openssh-server sudo -y
