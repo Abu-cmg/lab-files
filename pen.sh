@@ -36,8 +36,6 @@ mkdir -p /var/www/html/pages
 # FTP SETUP (ANONYMOUS ENABLED)
 ########################################
 
-echo "[+] Installing vsftpd..."
-apt install vsftpd -y
 
 echo "[+] Creating FTP directory..."
 mkdir -p /srv/ftp
