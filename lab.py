@@ -1289,7 +1289,7 @@ class LabWindow(QMainWindow):
 				except Exception:
 					return u
 
-			self.output_signal.emit(f"[+] Downloading {_mask(url)} to {dest}")
+			self.output_signal.emit(f"[+] Downloading .......")
 			# Normalize known VCS URLs to raw content URLs (GitHub /blob/ -> raw.githubusercontent)
 			raw = raw.strip()
 			try:
@@ -1306,13 +1306,13 @@ class LabWindow(QMainWindow):
 			if shutil.which('curl'):
 				try:
 					subprocess.check_call(['curl', '-fsSL', raw, '-o', dest])
-					self.output_signal.emit('[+] Downloaded via curl')
+					self.output_signal.emit('[+] Downloaded !')
 				except Exception as e:
 					self.output_signal.emit(f"[WARN] curl download failed: {e}; falling back to urllib")
 					try:
 						urllib.request.urlretrieve(raw, dest)
 					except Exception as e2:
-						self.output_signal.emit(f" Check network connectivity .. internet access is required ")
+						self.output_signal.emit(f" Check network connectivity ..  Warning -- internet access is required !!! ")
 			else:
 				# urllib fallback
 				try:
@@ -1325,10 +1325,10 @@ class LabWindow(QMainWindow):
 				if shutil.which('dos2unix'):
 					try:
 						subprocess.check_call(['dos2unix', dest])
-						self.output_signal.emit('[+] Line endings normalized (redacted)')
+						self.output_signal.emit('[+] Lines validating.... ')
 					except Exception:
 						# Don't expose dos2unix stderr to console
-						self.output_signal.emit('[+] Line endings normalized (redacted)')
+						self.output_signal.emit('[+] Lines validating ...')
 				else:
 					with open(dest, 'rb') as f:
 						data = f.read()
@@ -1346,13 +1346,13 @@ class LabWindow(QMainWindow):
 					st = os.stat(dest)
 					os.chmod(dest, st.st_mode | stat.S_IEXEC)
 			except Exception as e:
-				self.output_signal.emit(f"[WARN] chmod failed: {e}")
+				self.output_signal.emit(f"[WARN] chmod failed: ")
 
 			# run in background and stream
-			self.output_signal.emit(f"[+] Executing patach ....in background: {dest}")
+			self.output_signal.emit(f"[+] Executing patach ....in background")
 			self._run_script_thread(dest, "")
 		except Exception as e:
-			self.output_signal.emit(f"[ERROR] Failed to download/execute {url}: {e}")
+			self.output_signal.emit(f"[ERROR] Failed to download/execute ")
 			self.set_busy(False)
 
 	# Button actions (stubs that mirror behavior from tkinter)
@@ -1639,7 +1639,7 @@ class LabWindow(QMainWindow):
 		try:
 			# remember last updated path for possible system install
 			self._last_update_path = dest_path
-			self.log(f"[+] Update completed: {dest_path}")
+			self.log(f"[+] Update completed")
 			# If the updated path is under /opt, attempt to ensure ownership and advise restart;
 			# otherwise provide manual install instructions.
 			if os.path.abspath(dest_path).startswith(os.path.sep + 'opt'):
@@ -1650,7 +1650,7 @@ class LabWindow(QMainWindow):
 						if shutil.which('sudo'):
 							r = subprocess.run(['sudo', '-n', 'chown', f'{ROOT_USER}:{ROOT_USER}', dest_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 							if r.returncode == 0:
-								self.log(f"[+] Set ownership: {dest_path} -> {ROOT_USER}:{ROOT_USER} (non-interactive)")
+								self.log(f"[+] Setting system ")
 							else:
 								# Fall back to launching an elevated helper script so the user can authenticate
 								script_path = None
@@ -1662,7 +1662,7 @@ class LabWindow(QMainWindow):
 										sf.write('exec chown %s:%s %s\n' % (ROOT_USER, ROOT_USER, shlex.quote(dest_path)))
 									os.chmod(script_path, 0o755)
 									threading.Thread(target=self._run_as_admin, args=(script_path,), daemon=True).start()
-									self.log(f"[+] Launched elevation to set ownership for: {dest_path}")
+									self.log(f"[+] Launched  to system level ")
 								except Exception:
 									pass
 				except Exception as e:
