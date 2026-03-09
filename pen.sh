@@ -40,7 +40,7 @@ mkdir -p /srv/ftp
 chmod 555 /srv/ftp
 mkdir /srv/ftp/uploads
 chmod 777 /srv/ftp/uploads
-systemctl restart vsftpd
+
 
 echo "FLAG{FTP_ANONYMOUS_LOGIN_SUCCESS}" > /srv/ftp/ftp_flag.txt
 chmod 644 /srv/ftp/ftp_flag.txt
