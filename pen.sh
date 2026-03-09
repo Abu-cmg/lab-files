@@ -25,8 +25,6 @@ echo "[+] Creating root flag..."
 echo "FLAG{ROOT_ACCESS_COMPLETE}" > /root/root.txt
 chmod 600 /root/root.txt
 
-echo "[+] Adding sudo misconfiguration..."
-echo "developer ALL=(ALL) NOPASSWD: /usr/bin/find" >> /etc/sudoers
 
 echo "[+] Creating web structure..."
 mkdir -p /var/www/html/assets
