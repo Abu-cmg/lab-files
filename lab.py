@@ -23,6 +23,7 @@ _xvfb_proc = None
 
 # Prevent concurrent elevation attempts which can trigger PolicyKit conflicts
 _elev_lock = threading.Lock()
+_script_lock = threading.Lock()
 def ensure_display_via_xvfb(width=1280, height=720, depth=24, display=':99'):
 	"""Start Xvfb if DISPLAY is not set. Returns True if a DISPLAY is available."""
 	global _xvfb_proc
@@ -497,6 +498,8 @@ class LabWindow(QMainWindow):
 	output_signal = pyqtSignal(str)
 	# signal emitted when an update completes (dest path)
 	update_done_signal = pyqtSignal(str)
+	# signal to request showing a messagebox on the main thread: (title, message)
+	show_message_signal = pyqtSignal(str, str)
 
 	def __init__(self):
 		super().__init__()
@@ -958,6 +961,11 @@ class LabWindow(QMainWindow):
 		# Connect signals and buttons
 		self.output_signal.connect(self.log)
 		self.update_done_signal.connect(self._on_update_done)
+		# ensure messagebox requests from worker threads are shown on main thread
+		try:
+			self.show_message_signal.connect(self._show_message_box)
+		except Exception:
+			pass
 		self.install_btn.clicked.connect(self.install_lab)
 		self.reset_btn.clicked.connect(self.reset_lab)
 		# Open Shell button disabled and hidden per user request
@@ -1002,6 +1010,17 @@ class LabWindow(QMainWindow):
 
 		# process handle for running scripts
 		self.current_proc = None
+
+	def _show_message_box(self, title: str, message: str):
+		# Always run message boxes on the main thread via this slot
+		try:
+			QMessageBox.information(self, title, message)
+		except Exception:
+			# fallback to logging if QMessageBox fails
+			try:
+				self.output_signal.emit(f"[!] {title}: {message}")
+			except Exception:
+				pass
 
 		# application menu intentionally omitted (rendering toggle removed)
 
@@ -1225,7 +1244,7 @@ class LabWindow(QMainWindow):
 	def _run_script_thread(self, script_path: str, arg: str = ""):
 		"""Run a script in a background thread, stream output to UI via signal."""
 		def _worker():
-			with threading.Lock():
+			with _script_lock:
 				self.set_busy(True)
 				cmd = []
 				# if script_path looks like a shell script on unix, run directly; otherwise try as executable
@@ -1437,6 +1456,30 @@ class LabWindow(QMainWindow):
 		except Exception:
 			return cmd
 
+	def _safe_run(self, cmd, check=False, **kwargs):
+		"""Run subprocess.run capturing output and handle PolicyKit/GDBus errors.
+		Returns CompletedProcess or None on unexpected failure.
+		If a PolicyKit auth-agent conflict is detected, informs the user via GUI signal.
+		"""
+		try:
+			cp = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, **kwargs)
+			if cp.returncode != 0:
+				err = (cp.stderr or cp.stdout or '').lower()
+				if 'polkit' in err or 'policykit' in err or 'gdbus.error' in err or 'authentication agent already exists' in err:
+					# Inform user and avoid spawning extra agents
+					self.show_message_signal.emit('Privilege escalation failed',
+						'PolicyKit reported an authentication-agent conflict. Close other authentication dialogs or avoid concurrent elevation requests.')
+					return cp
+				if check:
+					raise subprocess.CalledProcessError(cp.returncode, cmd, output=cp.stdout, stderr=cp.stderr)
+			return cp
+		except subprocess.CalledProcessError as e:
+			self.output_signal.emit(f'[ERROR] Command failed: {e}')
+			return None
+		except Exception as e:
+			self.output_signal.emit(f'[ERROR] Running command failed: {e}')
+			return None
+
 	def install_lab(self):
 		# Prevent installing a new lab if one is already installed
 		if getattr(self, '_installed_lab', None):
@@ -1609,14 +1652,19 @@ class LabWindow(QMainWindow):
 				# If not installed yet, try passwordless sudo (non-interactive)
 				if not installed_dest and shutil.which('sudo'):
 					try:
-						r = subprocess.run(['sudo', '-n', 'cp', user_dest, dest], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-						if r.returncode == 0:
+						r = self._safe_run(['sudo', '-n', 'cp', user_dest, dest])
+						if r and r.returncode == 0:
 							# try chmod
-							r2 = subprocess.run(['sudo', '-n', 'chmod', '+x', dest], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+							r2 = self._safe_run(['sudo', '-n', 'chmod', '+x', dest])
 							installed_dest = dest
 							self.output_signal.emit(f"[+] Installed updated script to {dest} via sudo")
 						else:
-							self.output_signal.emit(f"[WARN]  failed: {r.stderr.decode(errors='ignore')}")
+							err = ''
+							try:
+								err = (r.stderr if r else '')
+							except Exception:
+								err = ''
+							self.output_signal.emit(f"[WARN]  failed: {err}")
 					except Exception as e:
 						self.output_signal.emit(f"[WARN]  attempt failed: {e}")
 				# Emit final result: system path if installed, otherwise user path
@@ -1648,9 +1696,9 @@ class LabWindow(QMainWindow):
 					if os.name != 'nt':
 						# First attempt non-interactive sudo chown
 						if shutil.which('sudo'):
-							r = subprocess.run(['sudo', '-n', 'chown', f'{ROOT_USER}:{ROOT_USER}', dest_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-							if r.returncode == 0:
-								self.log(f"[+] Setting system ")
+							r = self._safe_run(['sudo', '-n', 'chown', f'{ROOT_USER}:{ROOT_USER}', dest_path])
+							if r and r.returncode == 0:
+								self.output_signal.emit(f"[+] Setting system ")
 							else:
 								# Fall back to launching an elevated helper script so the user can authenticate
 								script_path = None
@@ -1688,7 +1736,8 @@ class LabWindow(QMainWindow):
 		# serialize elevation attempts to avoid races
 		acquired = _elev_lock.acquire(blocking=False)
 		if not acquired:
-			QMessageBox.information(self, 'Busy', 'An elevation is already in progress. Please wait and try again.')
+			# marshal dialog to main thread
+			self.show_message_signal.emit('Busy', 'An elevation is already in progress. Please wait and try again.')
 			return
 		try:
 			# If already root, run directly
@@ -1708,20 +1757,21 @@ class LabWindow(QMainWindow):
 					except Exception:
 						pass
 					subprocess.Popen(cmdlist, start_new_session=True)
-					self.log(f"[+] Running as root, launched script: {script_path}")
+					self.output_signal.emit(f"[+] Running as root, launched script: {script_path}")
 					return
 				except Exception as e:
-					self.log(f"[WARN] direct run as root failed: {e}")
+					self.output_signal.emit(f"[WARN] direct run as root failed: {e}")
 
 			# If sudo is not present, try direct exec and inform the user
 			if not shutil.which('sudo'):
-				self.log("[!] 'sudo' not found; attempting to run script directly")
+				self.output_signal.emit("[!] 'sudo' not found; attempting to run script directly")
 				try:
 					subprocess.Popen([script_path] + ([arg] if arg else []), start_new_session=True)
-					self.log(f"[+] Launched script directly: {script_path}")
+					self.output_signal.emit(f"[+] Launched script directly: {script_path}")
 				except Exception as e:
-					self.log(f"[ERROR] Could not launch installer: {e}")
-					QMessageBox.information(self, 'Install failed', f'Unable to elevate privileges. Please run:\n\nsudo {script_path} {arg}')
+					self.output_signal.emit(f"[ERROR] Could not launch installer: {e}")
+					# inform user from main thread
+					self.show_message_signal.emit('Install failed', f'Unable to elevate privileges. Please run:\n\nsudo {script_path} {arg}')
 				return
 
 			# Detect passwordless sudo (recommended). DO NOT handle passwords in the GUI.
@@ -1744,10 +1794,10 @@ class LabWindow(QMainWindow):
 						if arg:
 							cmd.append(arg)
 						subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.STDOUT, start_new_session=True)
-						self.log(f"[+] Launched passwordless tmux session: {sess} (script: {script_path})")
+						self.output_signal.emit(f"[+] Launched passwordless tmux session: {sess} (script: {script_path})")
 						return
 					except Exception as e:
-						self.log(f"[WARN] tmux launch failed: {e}")
+						self.output_signal.emit(f"[WARN] tmux launch failed: {e}")
 				# Fallback to nohup (detached, log to file)
 				try:
 					with open(logf, 'a') as outf:
@@ -1755,10 +1805,10 @@ class LabWindow(QMainWindow):
 						if arg:
 							cmd.append(arg)
 						subprocess.Popen(cmd, stdout=outf, stderr=subprocess.STDOUT, start_new_session=True)
-					self.log(f"[+] Launched passwordless nohup install (log: {logf})")
+					self.output_signal.emit(f"[+] Launched passwordless nohup install (log: {logf})")
 					return
 				except Exception as e:
-					self.log(f"[WARN] nohup launch failed: {e}")
+					self.output_signal.emit(f"[WARN] nohup launch failed: {e}")
 
 			# Passwordless sudo not available or background methods failed.
 			# Do NOT prompt for or pipe passwords from the GUI. Instruct user to
@@ -1773,12 +1823,13 @@ class LabWindow(QMainWindow):
 					"If you prefer to run manually, open a terminal and run:\n\n"
 					f"sudo {script_path} {arg}\n"
 				)
-				QMessageBox.information(self, 'Elevation required', msg)
+				# marshal dialog to main thread
+				self.show_message_signal.emit('Elevation required', msg)
 			except Exception:
 				pass
 
 		except Exception as e:
-			self.log(f"[ERROR] Could not launch installer: {e}")
+			self.output_signal.emit(f"[ERROR] Could not launch installer: {e}")
 		finally:
 			try:
 				_elev_lock.release()
@@ -1869,7 +1920,7 @@ class LabWindow(QMainWindow):
 			script_to_run = opt_reset if os.path.exists(opt_reset) else RESET_SCRIPT
 			if not script_to_run or not os.path.exists(script_to_run):
 				self.output_signal.emit(f'[WARN] Reset script not found: {script_to_run}')
-				QMessageBox.information(self, 'Reset missing', f'Reset script not found: {script_to_run}\nAborting restart.')
+				self.show_message_signal.emit('Reset missing', f'Reset script not found: {script_to_run}\nAborting restart.')
 				return
 			# ensure executable
 			try:
@@ -1886,51 +1937,57 @@ class LabWindow(QMainWindow):
 					is_root = False
 				if is_root:
 					self.output_signal.emit('[+] Running reset as root')
-					subprocess.run(['/bin/bash', script_to_run])
+					self._safe_run(['/bin/bash', script_to_run])
 				else:
 					# Require passwordless sudo
 					if not shutil.which('sudo'):
 						self.output_signal.emit('[ERROR] sudo not available; cannot run reset non-interactively')
-						QMessageBox.information(self, 'Cannot restart', 'sudo is required to perform reset and restart. Aborting.')
+						self.show_message_signal.emit('Cannot restart', 'sudo is required to perform reset and restart. Aborting.')
 						return
-					r = subprocess.run(['sudo', '-n', 'true'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-					if r.returncode != 0:
+					r = self._safe_run(['sudo', '-n', 'true'])
+					if not (r and r.returncode == 0):
 						self.output_signal.emit('system not configured for this user; aborting restart')
-						QMessageBox.information(self, 'Cannot restart', 'sudo is required to perform reset and restart. Aborting.')
+						self.show_message_signal.emit('Cannot restart', 'sudo is required to perform reset and restart. Aborting.')
 						return
 					# Run reset via sudo (blocking)
 					self.output_signal.emit('[+] Running reset ....')
-					subprocess.run(['sudo', '/bin/bash', script_to_run])
+					self._safe_run(['sudo', '/bin/bash', script_to_run])
 			except Exception as e:
 				self.output_signal.emit(f'[ERROR] Failed to execute reset: {e}')
 
 			# After reset finished (blocking), proceed to reboot using passwordless sudo/root
 			try:
 				self.output_signal.emit('[!] Attempting: systemctl reboot')
-				if os.name != 'nt' and (is_root or (shutil.which('sudo') and subprocess.run(['sudo', '-n', 'true'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0)):
-					# use sudo if not root, else direct
-					if not is_root:
-						subprocess.check_call(['sudo', 'systemctl', 'reboot'])
+				if os.name != 'nt':
+					pw_ok = False
+					if is_root:
+						pw_ok = True
 					else:
-						subprocess.check_call(['systemctl', 'reboot'])
+						if shutil.which('sudo'):
+							r = self._safe_run(['sudo', '-n', 'true'])
+							pw_ok = bool(r and r.returncode == 0)
+					if pw_ok:
+						# use sudo if not root, else direct
+						if not is_root:
+							r = self._safe_run(['sudo', 'systemctl', 'reboot'])
+						else:
+							r = self._safe_run(['systemctl', 'reboot'])
 			except Exception:
 				try:
 					self.output_signal.emit('[!] Fallback: shutdown -r now')
 					if not is_root:
-						subprocess.check_call(['sudo', 'shutdown', '-r', 'now'])
+						r = self._safe_run(['sudo', 'shutdown', '-r', 'now'])
 					else:
-						subprocess.check_call(['shutdown', '-r', 'now'])
+						r = self._safe_run(['shutdown', '-r', 'now'])
 				except Exception:
 					try:
 						self.output_signal.emit('[!] Fallback: reboot')
 						if not is_root:
-							subprocess.check_call(['sudo', 'reboot'])
+							r = self._safe_run(['sudo', 'reboot'])
 						else:
-							subprocess.check_call(['reboot'])
+							r = self._safe_run(['reboot'])
 					except Exception as e:
 						self.output_signal.emit(f'[ERROR] Restart failed: {e}')
-
-		threading.Thread(target=_restart_workflow, daemon=True).start()
 
 		threading.Thread(target=_restart_workflow, daemon=True).start()
 
@@ -1958,7 +2015,7 @@ class LabWindow(QMainWindow):
 			script_to_run = opt_reset if os.path.exists(opt_reset) else RESET_SCRIPT
 			if not script_to_run or not os.path.exists(script_to_run):
 				self.output_signal.emit(f'[WARN] Reset script not found: {script_to_run}')
-				QMessageBox.information(self, 'Reset missing', f'Reset script not found: {script_to_run}\nAborting shutdown.')
+				self.show_message_signal.emit('Reset missing', f'Reset script not found: {script_to_run}\nAborting shutdown.')
 				return
 			# ensure executable
 			try:
@@ -1975,30 +2032,38 @@ class LabWindow(QMainWindow):
 					is_root = False
 				if is_root:
 					self.output_signal.emit('[+] Running reset as root')
-					subprocess.run(['/bin/bash', script_to_run])
+					self._safe_run(['/bin/bash', script_to_run])
 				else:
 					if not shutil.which('sudo'):
 						self.output_signal.emit('[ERROR] sudo not available; cannot run reset non-interactively')
-						QMessageBox.information(self, 'Cannot shutdown', 'sudo is required to perform reset and shutdown. Aborting.')
+						self.show_message_signal.emit('Cannot shutdown', 'sudo is required to perform reset and shutdown. Aborting.')
 						return
-					r = subprocess.run(['sudo', '-n', 'true'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-					if r.returncode != 0:
+					r = self._safe_run(['sudo', '-n', 'true'])
+					if not (r and r.returncode == 0):
 						self.output_signal.emit('[ERROR]  sudo not configured for this user; aborting shutdown')
-						QMessageBox.information(self, 'Cannot shutdown', ' sudo is required to perform reset and shutdown. Aborting.')
+						self.show_message_signal.emit('Cannot shutdown', ' sudo is required to perform reset and shutdown. Aborting.')
 						return
 					self.output_signal.emit('[+] Running reset the system')
-					subprocess.run(['sudo', '/bin/bash', script_to_run])
+					self._safe_run(['sudo', '/bin/bash', script_to_run])
 			except Exception as e:
 				self.output_signal.emit(f'[ERROR] Failed to execute reset: {e}')
 
 			# After reset finished (blocking), proceed to poweroff using passwordless sudo/root
 			try:
 				self.output_signal.emit('[!] Attempting: systemctl poweroff')
-				if os.name != 'nt' and (is_root or (shutil.which('sudo') and subprocess.run(['sudo', '-n', 'true'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0)):
-					if not is_root:
-						subprocess.check_call(['sudo', 'systemctl', 'poweroff'])
+				if os.name != 'nt':
+					pw_ok = False
+					if is_root:
+						pw_ok = True
 					else:
-						subprocess.check_call(['systemctl', 'poweroff'])
+						if shutil.which('sudo'):
+							r = self._safe_run(['sudo', '-n', 'true'])
+							pw_ok = bool(r and r.returncode == 0)
+					if pw_ok:
+						if not is_root:
+							r = self._safe_run(['sudo', 'systemctl', 'poweroff'])
+						else:
+							r = self._safe_run(['systemctl', 'poweroff'])
 			except Exception:
 				try:
 					self.output_signal.emit('[!] Fallback: shutdown -h now')
