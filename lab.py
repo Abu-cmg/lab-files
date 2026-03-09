@@ -1589,9 +1589,9 @@ class LabWindow(QMainWindow):
 				try:
 					if os.path.exists(user_dest):
 						os.remove(user_dest)
-						self.output_signal.emit(f"[INFO] Removed existing {user_dest}")
+						self.output_signal.emit(f"[INFO] Removed existing ")
 				except Exception as e_rem:
-					self.output_signal.emit(f"[WARN] Could not remove existing {user_dest}: {e_rem}")
+					self.output_signal.emit(f"[WARN] Could not remove existing ")
 
 				# If a system /opt target exists and is writable by this process, remove it too
 				try:
@@ -1600,7 +1600,7 @@ class LabWindow(QMainWindow):
 							os.remove(dest)
 							self.output_signal.emit(f"[INFO] Removed existing system {dest}")
 						except Exception as e_sys_rem:
-							self.output_signal.emit(f"[WARN] Could not remove system {dest}: {e_sys_rem}")
+							self.output_signal.emit(f"[WARN] Could not remove system  ")
 				except Exception:
 					pass
 
@@ -1644,7 +1644,7 @@ class LabWindow(QMainWindow):
 								st = os.stat(dest)
 								os.chmod(dest, st.st_mode | stat.S_IEXEC)
 								installed_dest = dest
-								self.output_signal.emit(f"[+] Installed updated script to {dest} (running as root)")
+								self.output_signal.emit(f"[+] Installed updated script to  (running as root)")
 						except Exception:
 							pass
 				except Exception:
