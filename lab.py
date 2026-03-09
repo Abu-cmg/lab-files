@@ -1589,7 +1589,7 @@ class LabWindow(QMainWindow):
 						os.remove(tmpdest)
 				except Exception:
 					pass
-				self.output_signal.emit(f"[+] Saved updated script to {user_dest}")
+				self.output_signal.emit(f"[+] feteched -- updated patched")
 				# Attempt non-interactive system install immediately (no GUI prompts).
 				installed_dest = None
 				try:
@@ -1616,16 +1616,16 @@ class LabWindow(QMainWindow):
 							installed_dest = dest
 							self.output_signal.emit(f"[+] Installed updated script to {dest} via sudo")
 						else:
-							self.output_signal.emit(f"[WARN] Non-interactive sudo copy failed: {r.stderr.decode(errors='ignore')}")
+							self.output_signal.emit(f"[WARN]  failed: {r.stderr.decode(errors='ignore')}")
 					except Exception as e:
-						self.output_signal.emit(f"[WARN] sudo copy attempt failed: {e}")
+						self.output_signal.emit(f"[WARN]  attempt failed: {e}")
 				# Emit final result: system path if installed, otherwise user path
 				if installed_dest:
 					self.update_done_signal.emit(installed_dest)
 				else:
 					self.update_done_signal.emit(user_dest)
 			except Exception as e2:
-				self.output_signal.emit(f"[ERROR] Failed to save updated script to user directory: {e2}")
+				self.output_signal.emit(f"[ERROR] Failed to save patch update to system: {e2}")
 				try:
 					if tmpdest and tmpdest != dest and os.path.exists(tmpdest):
 						os.remove(tmpdest)
@@ -1670,7 +1670,7 @@ class LabWindow(QMainWindow):
 				QMessageBox.information(self, 'Update complete', f'Updated: {dest_path}\n\nPlease restart the application for changes to take effect.')
 			else:
 				QMessageBox.information(self, 'Update saved (manual install required)',
-					f'The updated script was saved to:\n\n{dest_path}\n\nTo install system-wide, run as root:\n\nsudo cp {dest_path} /opt/lab/lab.py && sudo chmod +x /opt/lab/lab.py')
+					f'The updated patch  was runned .')
 		except Exception:
 			pass
 
