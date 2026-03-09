@@ -5,7 +5,6 @@ import re
 import html as _html
 
 # VM / rendering safety: prefer CPU raster painting in VMs to avoid partial redraws
-# Only enable these aggressive fallbacks when running on Linux VMs or when
 # explicitly requested via RUNNING_IN_VM=1 or FORCE_RASTER=1 environment variable.
 _force_raster = os.environ.get('FORCE_RASTER', os.environ.get('RUNNING_IN_VM', '0')) == '1' or (sys.platform.startswith('linux') and os.environ.get('RUNNING_IN_VM', '0') == '1')
 if _force_raster:
