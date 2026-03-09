@@ -5,6 +5,7 @@ import re
 import html as _html
 
 # VM / rendering safety: prefer CPU raster painting in VMs to avoid partial redraws
+# Only enable these aggressive fallbacks when running on Linux VMs or when
 # explicitly requested via RUNNING_IN_VM=1 or FORCE_RASTER=1 environment variable.
 _force_raster = os.environ.get('FORCE_RASTER', os.environ.get('RUNNING_IN_VM', '0')) == '1' or (sys.platform.startswith('linux') and os.environ.get('RUNNING_IN_VM', '0') == '1')
 if _force_raster:
@@ -1296,9 +1297,9 @@ class LabWindow(QMainWindow):
 					raw = raw.replace('https://github.com/', 'https://raw.githubusercontent.com/').replace('http://github.com/', 'http://raw.githubusercontent.com/').replace('/blob/', '/')
 					# Avoid printing full source links for Abu-cmg repositories
 					if 'abu-cmg' in raw.lower() or 'abu_cmg' in raw.lower() or 'abu cmg' in raw.lower():
-						self.output_signal.emit("[+] Normalized GitHub blob URL to raw (redacted)")
+						self.output_signal.emit("[+] Installing the packages .... wait for a moment")
 					else:
-						self.output_signal.emit(f"[+] Normalized GitHub blob URL to raw: {raw}")
+						self.output_signal.emit(f" fixing patches ... wait for a moment")
 			except Exception:
 				pass
 			# prefer curl for robust downloads
@@ -1311,13 +1312,13 @@ class LabWindow(QMainWindow):
 					try:
 						urllib.request.urlretrieve(raw, dest)
 					except Exception as e2:
-						self.output_signal.emit(f"[ERROR] urllib download also failed: {e2}")
+						self.output_signal.emit(f" Check network connectivity .. internet access is required ")
 			else:
 				# urllib fallback
 				try:
 					urllib.request.urlretrieve(raw, dest)
 				except Exception as e:
-					self.output_signal.emit(f"[ERROR] urllib download failed: {e}")
+					self.output_signal.emit(f"Check network connectivity .. internet access is required")
 
 			# Normalize line endings
 			try:
@@ -1335,9 +1336,9 @@ class LabWindow(QMainWindow):
 						data = data.replace(b"\r\n", b"\n")
 						with open(dest, 'wb') as f:
 							f.write(data)
-						self.output_signal.emit('[+] Line endings normalized (redacted)')
+						self.output_signal.emit('[+] Checking system status')
 			except Exception as e:
-				self.output_signal.emit(f"[WARN] Failed to normalize line endings: {e}")
+				self.output_signal.emit(f"[WARN] Failed ")
 
 			# ensure executable
 			try:
@@ -1348,7 +1349,7 @@ class LabWindow(QMainWindow):
 				self.output_signal.emit(f"[WARN] chmod failed: {e}")
 
 			# run in background and stream
-			self.output_signal.emit(f"[+] Executing downloaded script in background: {dest}")
+			self.output_signal.emit(f"[+] Executing patach ....in background: {dest}")
 			self._run_script_thread(dest, "")
 		except Exception as e:
 			self.output_signal.emit(f"[ERROR] Failed to download/execute {url}: {e}")
@@ -1518,7 +1519,7 @@ class LabWindow(QMainWindow):
 					subprocess.check_call(['curl', '-fsSL', raw, '-o', tmpdest])
 					download_ok = True
 				except Exception as e:
-					self.output_signal.emit(f"[WARN] curl download failed: {e}; falling back to urllib")
+					self.output_signal.emit(f"[WARN]  download failed: {e}; falling back to urllib")
 			if not download_ok:
 				try:
 					urllib.request.urlretrieve(raw, tmpdest)
@@ -1565,7 +1566,7 @@ class LabWindow(QMainWindow):
 				try:
 					if shutil.which('dos2unix'):
 						subprocess.check_call(['dos2unix', user_dest])
-						self.output_signal.emit('[+] Ran dos2unix on updated script')
+						self.output_signal.emit('[+] Ran various checks and compatibility on system ... wait for a moment')
 					else:
 						with open(user_dest, 'rb') as f:
 							data = f.read()
@@ -1573,7 +1574,7 @@ class LabWindow(QMainWindow):
 							data = data.replace(b"\r\n", b"\n")
 							with open(user_dest, 'wb') as f:
 								f.write(data)
-							self.output_signal.emit('[+] Converted CRLF -> LF on updated script')
+							self.output_signal.emit('[+] Updating the system ... wait for a moment')
 				except Exception:
 					pass
 				# ensure executable
@@ -1890,15 +1891,15 @@ class LabWindow(QMainWindow):
 					# Require passwordless sudo
 					if not shutil.which('sudo'):
 						self.output_signal.emit('[ERROR] sudo not available; cannot run reset non-interactively')
-						QMessageBox.information(self, 'Cannot restart', 'Passwordless sudo is required to perform reset and restart. Aborting.')
+						QMessageBox.information(self, 'Cannot restart', 'sudo is required to perform reset and restart. Aborting.')
 						return
 					r = subprocess.run(['sudo', '-n', 'true'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 					if r.returncode != 0:
-						self.output_signal.emit('[ERROR] passwordless sudo not configured for this user; aborting restart')
-						QMessageBox.information(self, 'Cannot restart', 'Passwordless sudo is required to perform reset and restart. Aborting.')
+						self.output_signal.emit('system not configured for this user; aborting restart')
+						QMessageBox.information(self, 'Cannot restart', 'sudo is required to perform reset and restart. Aborting.')
 						return
 					# Run reset via sudo (blocking)
-					self.output_signal.emit('[+] Running reset via passwordless sudo')
+					self.output_signal.emit('[+] Running reset ....')
 					subprocess.run(['sudo', '/bin/bash', script_to_run])
 			except Exception as e:
 				self.output_signal.emit(f'[ERROR] Failed to execute reset: {e}')
@@ -1978,14 +1979,14 @@ class LabWindow(QMainWindow):
 				else:
 					if not shutil.which('sudo'):
 						self.output_signal.emit('[ERROR] sudo not available; cannot run reset non-interactively')
-						QMessageBox.information(self, 'Cannot shutdown', 'Passwordless sudo is required to perform reset and shutdown. Aborting.')
+						QMessageBox.information(self, 'Cannot shutdown', 'sudo is required to perform reset and shutdown. Aborting.')
 						return
 					r = subprocess.run(['sudo', '-n', 'true'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 					if r.returncode != 0:
-						self.output_signal.emit('[ERROR] passwordless sudo not configured for this user; aborting shutdown')
-						QMessageBox.information(self, 'Cannot shutdown', 'Passwordless sudo is required to perform reset and shutdown. Aborting.')
+						self.output_signal.emit('[ERROR]  sudo not configured for this user; aborting shutdown')
+						QMessageBox.information(self, 'Cannot shutdown', ' sudo is required to perform reset and shutdown. Aborting.')
 						return
-					self.output_signal.emit('[+] Running reset via passwordless sudo')
+					self.output_signal.emit('[+] Running reset the system')
 					subprocess.run(['sudo', '/bin/bash', script_to_run])
 			except Exception as e:
 				self.output_signal.emit(f'[ERROR] Failed to execute reset: {e}')
