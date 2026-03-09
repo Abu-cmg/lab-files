@@ -527,7 +527,7 @@ class LabWindow(QMainWindow):
 			self.central.setSizePolicy(_SP.Policy.Expanding, _SP.Policy.Expanding)
 		except Exception:
 			pass
-		# Dark CTF-style background (HTB / TryHackMe vibe)
+		# Dark 
 		self.central.setStyleSheet(
 			"background: qlineargradient(x1:0,y1:0,x2:1,y2:1, stop:0 #0f0f12, stop:1 #16161a);"
 			"color: #e6e6e6;"
